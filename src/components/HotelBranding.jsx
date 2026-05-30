@@ -13,7 +13,7 @@ export default function HotelBranding({ hotel }) {
                 Recomendado por el hotel
               </p>
               <h2 className="mt-2 text-2xl font-semibold tracking-normal text-[#242130] sm:text-3xl">
-                Una guía curada por {hotel?.name || 'el hotel'}
+                Una guía seleccionada por {hotel?.name || 'el hotel'}
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-[#6f6a7f] sm:text-[15px]">
                 Seleccionamos actividades, lugares y datos útiles para que aproveches tu estadía
@@ -23,7 +23,7 @@ export default function HotelBranding({ hotel }) {
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-1">
-            <TrustItem icon="shield" title="Curado" text="Opciones revisadas para huéspedes." />
+            <TrustItem icon="shield" title="Revisado" text="Opciones pensadas para huéspedes." />
             <TrustItem icon="leaf" title="Local" text="Experiencias cercanas y auténticas." />
             <TrustItem icon="calendar" title="Actual" text="Ideal para planificar durante la estadía." />
           </div>

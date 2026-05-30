@@ -1,0 +1,29 @@
+import { CATEGORIES } from '../data/recommendations';
+import Icon from './Icon';
+
+export default function CategoryFilter({ active, onChange }) {
+  return (
+    <div className="mt-3 flex gap-2 overflow-x-auto whitespace-nowrap pb-1 hide-scrollbar">
+      {CATEGORIES.map((category) => {
+        const isActive = active === category.id;
+
+        return (
+          <button
+            className={[
+              'inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-semibold transition active:scale-[0.98]',
+              isActive
+                ? 'border-[#6f5c92] bg-[#6f5c92] text-white shadow-[0_12px_26px_rgba(111,92,146,0.22)]'
+                : 'border-[#e7ddf2] bg-white/80 text-[#6f6a7f] shadow-sm hover:border-[#cfc0df] hover:text-[#4f4562]',
+            ].join(' ')}
+            key={category.id}
+            onClick={() => onChange(category.id)}
+            type="button"
+          >
+            <Icon name={category.icon} size={16} />
+            {category.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}

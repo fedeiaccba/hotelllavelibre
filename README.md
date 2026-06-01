@@ -1,5 +1,5 @@
 # React + Vite
-////
+////////
 Deploy listo para Vercel con fallback de rutas internas como `/admin`.
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

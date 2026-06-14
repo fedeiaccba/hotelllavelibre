@@ -1,6 +1,12 @@
 import { ADMIN_EVENTS, ADMIN_USERS, HOTELS, PLATFORM_SETTINGS, SALES } from '../data/adminMock';
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient';
 
+// Comportamiento:
+// - Si Supabase está configurado (hay credenciales en .env.local), la base de datos
+//   es la ÚNICA fuente de verdad: todas las operaciones golpean Supabase y, si algo
+//   falla (schema sin aplicar, RLS, etc.), el error se propaga a la UI para que se vea.
+// - Si NO está configurado, se usa localStorage con datos mock (modo demo sin backend).
+
 const LOCAL_ADMIN_USERS_KEY = 'gringacho_admin_users';
 const LOCAL_EVENTS_KEY = 'gringacho_events';
 const LOCAL_HOTELS_KEY = 'gringacho_hotels';
@@ -40,6 +46,7 @@ function toHotelRow(hotel) {
     admin_name: hotel.adminName,
     public_url: hotel.publicUrl,
     qr_scans: Number(hotel.qrScans || 0),
+    auto_charge: Boolean(hotel.autoCharge),
   };
 }
 
@@ -54,6 +61,7 @@ function fromHotelRow(row) {
     adminName: row.admin_name,
     publicUrl: row.public_url,
     qrScans: row.qr_scans || 0,
+    autoCharge: Boolean(row.auto_charge),
     recommendations: row.recommendations || 0,
     lastUpdate: formatDate(row.updated_at),
   };
@@ -212,20 +220,16 @@ export async function authenticateAdmin(email, password) {
   const normalizedEmail = email.trim().toLowerCase();
 
   if (isSupabaseConfigured) {
-    try {
-      const { data, error } = await supabase
-        .from('admin_users')
-        .select('*')
-        .eq('email', normalizedEmail)
-        .eq('password', password)
-        .eq('status', 'Activo')
-        .maybeSingle();
+    const { data, error } = await supabase
+      .from('admin_users')
+      .select('*')
+      .eq('email', normalizedEmail)
+      .eq('password', password)
+      .eq('status', 'Activo')
+      .maybeSingle();
 
-      if (error) throw error;
-      return data ? fromAdminUserRow(data) : findLocalAdmin(email, password);
-    } catch {
-      return findLocalAdmin(email, password);
-    }
+    if (error) throw error;
+    return data ? fromAdminUserRow(data) : null;
   }
 
   return findLocalAdmin(email, password);
@@ -233,17 +237,13 @@ export async function authenticateAdmin(email, password) {
 
 export async function listAdminUsers() {
   if (isSupabaseConfigured) {
-    try {
-      const { data, error } = await supabase
-        .from('admin_users')
-        .select('*')
-        .order('created_at', { ascending: true });
+    const { data, error } = await supabase
+      .from('admin_users')
+      .select('*')
+      .order('created_at', { ascending: true });
 
-      if (error) throw error;
-      return data.map(fromAdminUserRow);
-    } catch {
-      return readLocal(LOCAL_ADMIN_USERS_KEY, ADMIN_USERS);
-    }
+    if (error) throw error;
+    return data.map(fromAdminUserRow);
   }
 
   return readLocal(LOCAL_ADMIN_USERS_KEY, ADMIN_USERS);
@@ -251,18 +251,14 @@ export async function listAdminUsers() {
 
 export async function createAdminUser(payload) {
   if (isSupabaseConfigured) {
-    try {
-      const { data, error } = await supabase
-        .from('admin_users')
-        .insert(toAdminUserRow(payload))
-        .select()
-        .single();
+    const { data, error } = await supabase
+      .from('admin_users')
+      .insert(toAdminUserRow(payload))
+      .select()
+      .single();
 
-      if (error) throw error;
-      return fromAdminUserRow(data);
-    } catch {
-      // Fall through to the local demo store when the optional Supabase table is not applied yet.
-    }
+    if (error) throw error;
+    return fromAdminUserRow(data);
   }
 
   const users = readLocal(LOCAL_ADMIN_USERS_KEY, ADMIN_USERS);
@@ -278,19 +274,15 @@ export async function createAdminUser(payload) {
 
 export async function updateAdminUser(id, payload) {
   if (isSupabaseConfigured) {
-    try {
-      const { data, error } = await supabase
-        .from('admin_users')
-        .update(toAdminUserRow(payload))
-        .eq('id', id)
-        .select()
-        .single();
+    const { data, error } = await supabase
+      .from('admin_users')
+      .update(toAdminUserRow(payload))
+      .eq('id', id)
+      .select()
+      .single();
 
-      if (error) throw error;
-      return fromAdminUserRow(data);
-    } catch {
-      // Fall through to the local demo store when the optional Supabase table is not applied yet.
-    }
+    if (error) throw error;
+    return fromAdminUserRow(data);
   }
 
   const users = readLocal(LOCAL_ADMIN_USERS_KEY, ADMIN_USERS);
@@ -309,13 +301,9 @@ export async function updateAdminUser(id, payload) {
 
 export async function deleteAdminUser(id) {
   if (isSupabaseConfigured) {
-    try {
-      const { error } = await supabase.from('admin_users').delete().eq('id', id);
-      if (error) throw error;
-      return;
-    } catch {
-      // Fall through to the local demo store when the optional Supabase table is not applied yet.
-    }
+    const { error } = await supabase.from('admin_users').delete().eq('id', id);
+    if (error) throw error;
+    return;
   }
 
   const users = readLocal(LOCAL_ADMIN_USERS_KEY, ADMIN_USERS);
@@ -386,6 +374,8 @@ export async function updateHotel(id, payload) {
 
 export async function deleteHotel(id) {
   if (isSupabaseConfigured) {
+    // Las FKs con ON DELETE CASCADE / SET NULL limpian recommendations, events,
+    // sales y desasignan a los admins del hotel automáticamente.
     const { error } = await supabase.from('hotels').delete().eq('id', id);
     if (error) throw error;
     return;
@@ -507,17 +497,13 @@ export async function deleteRecommendation(id) {
 
 export async function listEvents() {
   if (isSupabaseConfigured) {
-    try {
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data.map(fromEventRow);
-    } catch {
-      return readLocal(LOCAL_EVENTS_KEY, ADMIN_EVENTS);
-    }
+    if (error) throw error;
+    return data.map(fromEventRow);
   }
 
   return readLocal(LOCAL_EVENTS_KEY, ADMIN_EVENTS);
@@ -525,18 +511,14 @@ export async function listEvents() {
 
 export async function createEvent(payload) {
   if (isSupabaseConfigured) {
-    try {
-      const { data, error } = await supabase
-        .from('events')
-        .insert(toEventRow(payload))
-        .select()
-        .single();
+    const { data, error } = await supabase
+      .from('events')
+      .insert(toEventRow(payload))
+      .select()
+      .single();
 
-      if (error) throw error;
-      return fromEventRow(data);
-    } catch {
-      // Fall through to the local demo store when the optional Supabase table is not applied yet.
-    }
+    if (error) throw error;
+    return fromEventRow(data);
   }
 
   const events = readLocal(LOCAL_EVENTS_KEY, ADMIN_EVENTS);
@@ -547,19 +529,15 @@ export async function createEvent(payload) {
 
 export async function updateEvent(id, payload) {
   if (isSupabaseConfigured) {
-    try {
-      const { data, error } = await supabase
-        .from('events')
-        .update(toEventRow(payload))
-        .eq('id', id)
-        .select()
-        .single();
+    const { data, error } = await supabase
+      .from('events')
+      .update(toEventRow(payload))
+      .eq('id', id)
+      .select()
+      .single();
 
-      if (error) throw error;
-      return fromEventRow(data);
-    } catch {
-      // Fall through to the local demo store when the optional Supabase table is not applied yet.
-    }
+    if (error) throw error;
+    return fromEventRow(data);
   }
 
   const events = readLocal(LOCAL_EVENTS_KEY, ADMIN_EVENTS);
@@ -572,13 +550,9 @@ export async function updateEvent(id, payload) {
 
 export async function deleteEvent(id) {
   if (isSupabaseConfigured) {
-    try {
-      const { error } = await supabase.from('events').delete().eq('id', id);
-      if (error) throw error;
-      return;
-    } catch {
-      // Fall through to the local demo store when the optional Supabase table is not applied yet.
-    }
+    const { error } = await supabase.from('events').delete().eq('id', id);
+    if (error) throw error;
+    return;
   }
 
   const events = readLocal(LOCAL_EVENTS_KEY, ADMIN_EVENTS);
@@ -590,17 +564,13 @@ export async function deleteEvent(id) {
 
 export async function listSales() {
   if (isSupabaseConfigured) {
-    try {
-      const { data, error } = await supabase
-        .from('sales')
-        .select('*')
-        .order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('sales')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data.map(fromSaleRow);
-    } catch {
-      return readLocal(LOCAL_SALES_KEY, SALES);
-    }
+    if (error) throw error;
+    return data.map(fromSaleRow);
   }
 
   return readLocal(LOCAL_SALES_KEY, SALES);
@@ -608,18 +578,14 @@ export async function listSales() {
 
 export async function createSale(payload) {
   if (isSupabaseConfigured) {
-    try {
-      const { data, error } = await supabase
-        .from('sales')
-        .insert(toSaleRow(payload))
-        .select()
-        .single();
+    const { data, error } = await supabase
+      .from('sales')
+      .insert(toSaleRow(payload))
+      .select()
+      .single();
 
-      if (error) throw error;
-      return fromSaleRow(data);
-    } catch {
-      // Fall through to the local demo store when the optional Supabase table is not applied yet.
-    }
+    if (error) throw error;
+    return fromSaleRow(data);
   }
 
   const sales = readLocal(LOCAL_SALES_KEY, SALES);
@@ -638,19 +604,15 @@ export async function createSale(payload) {
 
 export async function updateSale(id, payload) {
   if (isSupabaseConfigured) {
-    try {
-      const { data, error } = await supabase
-        .from('sales')
-        .update(toSaleRow(payload))
-        .eq('id', id)
-        .select()
-        .single();
+    const { data, error } = await supabase
+      .from('sales')
+      .update(toSaleRow(payload))
+      .eq('id', id)
+      .select()
+      .single();
 
-      if (error) throw error;
-      return fromSaleRow(data);
-    } catch {
-      // Fall through to the local demo store when the optional Supabase table is not applied yet.
-    }
+    if (error) throw error;
+    return fromSaleRow(data);
   }
 
   const sales = readLocal(LOCAL_SALES_KEY, SALES);
@@ -671,13 +633,9 @@ export async function updateSale(id, payload) {
 
 export async function deleteSale(id) {
   if (isSupabaseConfigured) {
-    try {
-      const { error } = await supabase.from('sales').delete().eq('id', id);
-      if (error) throw error;
-      return;
-    } catch {
-      // Fall through to the local demo store when the optional Supabase table is not applied yet.
-    }
+    const { error } = await supabase.from('sales').delete().eq('id', id);
+    if (error) throw error;
+    return;
   }
 
   const sales = readLocal(LOCAL_SALES_KEY, SALES);

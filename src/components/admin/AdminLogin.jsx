@@ -21,12 +21,12 @@ export default function AdminLogin() {
     try {
       user = await authenticateAdmin(form.email, form.password);
     } catch (currentError) {
-      setError(currentError.message || 'No se pudo iniciar sesiÃ³n.');
+      setError(currentError.message || 'No se pudo iniciar sesión.');
       return;
     }
 
     if (!user) {
-      setError('Credenciales inválidas. Probá con los usuarios demo.');
+      setError('Email o contraseña incorrectos.');
       return;
     }
 
@@ -88,7 +88,7 @@ export default function AdminLogin() {
                   icon="mail"
                   label="Email"
                   onChange={(value) => setForm((current) => ({ ...current, email: value }))}
-                  placeholder="admin@demo.com"
+                  placeholder="tu@email.com"
                   type="email"
                   value={form.email}
                 />
@@ -96,7 +96,7 @@ export default function AdminLogin() {
                   icon="lock"
                   label="Contraseña"
                   onChange={(value) => setForm((current) => ({ ...current, password: value }))}
-                  placeholder="123456"
+                  placeholder="Tu contraseña"
                   type="password"
                   value={form.password}
                 />
@@ -115,12 +115,6 @@ export default function AdminLogin() {
                   <Icon name="arrowRight" size={16} />
                 </button>
               </form>
-
-              <div className="mt-6 rounded-[24px] border border-[#f1e6d2] bg-[#fbf5ea] p-4 text-xs leading-6 text-[#8a786b]">
-                <p className="font-semibold text-[#4a342a]">Usuarios demo</p>
-                <p>Super admin: admin@demo.com / 123456</p>
-                <p>Hotel admin: hotel@demo.com / 123456</p>
-              </div>
             </div>
           </section>
         </div>

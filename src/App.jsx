@@ -176,9 +176,11 @@ function PublicGuide() {
 
       {checkoutRec && (
         <CheckoutModal
+          autoCharge={Boolean(activeHotel?.autoCharge)}
           rec={checkoutRec}
           onClose={() => setCheckoutRec(null)}
           onConfirm={async ({ guestName, guestRoom, quantity, amount }) => {
+            const auto = Boolean(activeHotel?.autoCharge);
             await createSale({
               hotelId: activeHotel?.id || checkoutRec.hotelId || null,
               recommendationId: checkoutRec.id,
@@ -190,8 +192,8 @@ function PublicGuide() {
               quantity,
               amount,
               commission: (Number(checkoutRec.commission) || 0) * quantity,
-              status: 'Pendiente',
-              note: 'Reserva online del huésped',
+              status: auto ? 'Cobrado' : 'Pendiente',
+              note: auto ? 'Reserva online (cobro automático)' : 'Reserva online del huésped',
             });
           }}
         />

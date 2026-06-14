@@ -3,7 +3,7 @@ import Icon from './Icon';
 
 // Checkout simple para el huésped: ve el servicio y paga desde su teléfono.
 // Nunca se muestra la comisión (es interna del recepcionista).
-export default function CheckoutModal({ rec, onClose, onConfirm }) {
+export default function CheckoutModal({ rec, onClose, onConfirm, autoCharge = false }) {
   const [form, setForm] = useState({ guestName: '', guestRoom: '', quantity: 1 });
   const [status, setStatus] = useState('form'); // 'form' | 'saving' | 'done'
 
@@ -78,11 +78,13 @@ export default function CheckoutModal({ rec, onClose, onConfirm }) {
               <Icon name="check" size={26} />
             </span>
             <h3 className="mt-4 font-display text-2xl font-semibold text-[#2a1d18]">
-              ¡Reserva registrada!
+              {autoCharge ? '¡Reserva confirmada!' : '¡Reserva registrada!'}
             </h3>
             <p className="mt-2 text-sm leading-6 text-[#7c6a5e]">
-              {rec.paymentUrl
-                ? 'Abrimos el pago en una pestaña nueva. Al completarlo, la recepción confirma tu reserva.'
+              {autoCharge
+                ? rec.paymentUrl
+                  ? 'Te llevamos al pago. Al completarlo, tu reserva queda confirmada automáticamente.'
+                  : 'Tu reserva quedó confirmada. ¡Te esperamos!'
                 : 'Tu pedido llegó a la recepción del hotel. Te van a contactar para coordinar y cobrar.'}
             </p>
             <button
@@ -130,7 +132,7 @@ export default function CheckoutModal({ rec, onClose, onConfirm }) {
             </div>
 
             <button
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#6e1f2c] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(94,26,42,0.22)] transition hover:bg-[#561420] active:scale-[0.98] disabled:opacity-60"
+              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[linear-gradient(180deg,#7d2230_0%,#6e1f2c_50%,#581522_100%)] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(94,26,42,0.28)] transition hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
               disabled={status === 'saving'}
               type="submit"
             >

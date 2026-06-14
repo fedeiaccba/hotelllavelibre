@@ -92,7 +92,7 @@ export default function DetailModal({ rec, onClose, onCheckout }) {
                 )}
               </div>
               <button
-                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#6e1f2c] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(94,26,42,0.22)] transition hover:bg-[#561420] active:scale-[0.98]"
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[linear-gradient(180deg,#7d2230_0%,#6e1f2c_50%,#581522_100%)] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(94,26,42,0.28)] transition hover:brightness-110 active:scale-[0.98]"
                 onClick={() => onCheckout(rec)}
                 type="button"
               >

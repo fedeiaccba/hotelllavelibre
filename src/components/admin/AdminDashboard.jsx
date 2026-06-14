@@ -36,6 +36,7 @@ const EMPTY_HOTEL = {
   adminName: '',
   publicUrl: '',
   qrScans: 0,
+  autoCharge: false,
 };
 
 const EMPTY_RECOMMENDATION = {
@@ -404,8 +405,12 @@ export default function AdminDashboard({ user }) {
               <p className="truncate text-sm font-semibold text-[#2a1d18] sm:text-[15px]">
                 {isSuperAdmin ? 'Admin General' : activeHotel?.name || 'Hotel admin'}
               </p>
-              <p className="hidden text-xs text-[#9a877a] sm:block">
-                {isSupabaseConfigured ? 'Conectado a Supabase' : 'Modo mock local'}
+              <p
+                className={`hidden text-xs font-semibold sm:block ${
+                  isSupabaseConfigured ? 'text-[#356b48]' : 'text-[#8c6b1f]'
+                }`}
+              >
+                {isSupabaseConfigured ? '● Base de datos conectada' : '● Modo local (sin base)'}
               </p>
             </div>
           </div>
@@ -773,6 +778,7 @@ function HotelProfileSection({ hotel, onEdit }) {
         <InfoCard label="Plan" value={hotel?.plan} />
         <InfoCard label="URL pública" value={hotel?.publicUrl} />
         <InfoCard label="Estado" value={hotel?.status} />
+        <InfoCard label="Cobro del huésped" value={hotel?.autoCharge ? 'Automático' : 'Manual'} />
       </div>
       <div className="mt-4 rounded-[24px] border border-[#ece0cc] bg-[#fbf5ea] p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#a8978b]">
@@ -1174,6 +1180,15 @@ function HotelForm({ initialValue, onCancel, onSubmit }) {
           value={form.status}
         />
       </div>
+      <SelectField
+        label="Modo de cobro del huésped"
+        onChange={(value) => update('autoCharge', value === 'true')}
+        options={[
+          { label: 'Automático — la comisión se acredita al pagar', value: 'true' },
+          { label: 'Manual — la recepción confirma cada cobro', value: 'false' },
+        ]}
+        value={form.autoCharge ? 'true' : 'false'}
+      />
       <FormField label="Admin visible" onChange={(value) => update('adminName', value)} value={form.adminName} />
       <FormField label="URL pública" onChange={(value) => update('publicUrl', value)} value={form.publicUrl} />
       <FormActions onCancel={onCancel} />
@@ -1498,7 +1513,7 @@ function Panel({ action, children, eyebrow, icon, title }) {
 function ActionButton({ icon, label, onClick, size = 'md', variant = 'primary' }) {
   const classes =
     variant === 'primary'
-      ? 'bg-[#6e1f2c] text-white shadow-[0_14px_30px_rgba(94,26,42,0.22)] hover:bg-[#561420]'
+      ? 'bg-[linear-gradient(180deg,#7d2230_0%,#6e1f2c_50%,#581522_100%)] text-white shadow-[0_10px_24px_rgba(94,26,42,0.26)] hover:brightness-110'
       : 'border border-[#e6d7bf] bg-white/80 text-[#6e1f2c] shadow-sm hover:border-[#cbb389]';
 
   return (
@@ -1628,7 +1643,7 @@ function FormActions({ onCancel }) {
         Cancelar
       </button>
       <button
-        className="rounded-full bg-[#6e1f2c] px-5 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(94,26,42,0.22)]"
+        className="rounded-full bg-[linear-gradient(180deg,#7d2230_0%,#6e1f2c_50%,#581522_100%)] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(94,26,42,0.26)] transition hover:brightness-110"
         type="submit"
       >
         Guardar cambios

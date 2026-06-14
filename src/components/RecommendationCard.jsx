@@ -19,9 +19,9 @@ export default function RecommendationCard({ rec, index, onCheckout, onSelect })
 
   return (
     <article
-      className={`rec-card card-animate stagger-${Math.min(index + 1, 9)} flex min-w-0 flex-col overflow-hidden rounded-[30px] border border-[#ece0cc] bg-white shadow-[0_18px_55px_rgba(94,26,42,0.10)]`}
+      className={`rec-card card-animate stagger-${Math.min(index + 1, 9)} flex min-w-0 flex-col rounded-[30px] border border-[#ece0cc] bg-white shadow-[0_18px_55px_rgba(94,26,42,0.10)]`}
     >
-      <div className="relative h-56 overflow-hidden bg-[#ede1cd]">
+      <div className="relative h-56 overflow-hidden rounded-t-[30px] bg-[#ede1cd]">
         <img
           alt={rec.title}
           className="h-full w-full object-cover transition duration-500"
@@ -76,7 +76,7 @@ export default function RecommendationCard({ rec, index, onCheckout, onSelect })
         {rec.bookable ? (
           <div className="mt-5 flex items-center gap-2">
             <button
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-[#6e1f2c] px-4 py-3 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(94,26,42,0.22)] transition hover:bg-[#561420] active:scale-[0.98]"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-[linear-gradient(180deg,#7d2230_0%,#6e1f2c_50%,#581522_100%)] px-4 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(94,26,42,0.28)] transition hover:brightness-110 active:scale-[0.98]"
               onClick={() => onCheckout(rec)}
               type="button"
             >

@@ -37,18 +37,49 @@ Cada servicio tiene: `bookable` (cobrable), `price` (precio al huésped, €), `
 `supabase/schema.sql` es idempotente. Para aplicar los cambios, corré el archivo completo en el SQL Editor de Supabase. Agrega:
 
 - Columnas nuevas en `recommendations`: `bookable`, `price`, `commission`, `provider`, `payment_url`.
+- Columna nueva en `hotels`: `auto_charge` (modo de cobro automático/manual).
 - Tabla nueva `sales` (cobros) con índices, trigger de `updated_at` y políticas RLS demo.
 
 Si trabajás en **modo mock local** (sin credenciales de Supabase) ya funciona: hay servicios y cobros de ejemplo en `src/data/`, y todo persiste en `localStorage`.
 
-> **Pago online:** el huésped paga con un *link de pago* por servicio (lo creás en Stripe o Mercado Pago y lo pegás en el campo "Link de pago"). No hace falta backend ni claves secretas en el código. La recepción confirma el cobro cuando el pago se acredita.
+> **Pago online:** el huésped paga con un *link de pago* por servicio (lo creás en Stripe o Mercado Pago y lo pegás en el campo "Link de pago"). No hace falta backend ni claves secretas en el código.
 
-## 4. Cómo correr
+## 4. Modo de cobro: automático o manual
+
+Cada hotel elige su modo desde el panel (formulario del hotel → "Modo de cobro del huésped"):
+
+- **Manual:** la reserva del huésped entra como **Pendiente** y la recepción la confirma a mano. La comisión se cuenta al confirmar.
+- **Automático:** la reserva entra directo como **Cobrado** y la comisión se acredita sola, sin pasos manuales.
+
+Para una confirmación **verificada** del pago (que el dinero entró de verdad), hay un webhook listo en `supabase/functions/payment-webhook/index.ts`: lo conectás a Stripe/Mercado Pago y, cuando llega el pago aprobado, marca la venta como Cobrado. Es opcional; el modo automático ya funciona sin él de forma optimista.
+
+## 5. Ajustes visuales
+
+- **Tipografía** más prolija: títulos y marca en *Cormorant Garamond*, cuerpo en *Inter*.
+- **Botones**: se corregía el recorte de la sombra (lo causaba el `overflow-hidden` de la tarjeta) y ahora el fondo es un degradado borgoña más prolijo.
+- Rendimiento: se quitaron los `backdrop-blur` pesados que trababan el scroll.
+
+## 6. Base de datos: ahora es la fuente de verdad
+
+Antes, si una operación contra Supabase fallaba, la app la guardaba en `localStorage`
+en silencio: parecía que creabas usuarios/servicios pero no llegaban a la base.
+
+Ahora, **si hay credenciales en `.env.local`, todo va a Supabase** (crear/editar/borrar
+usuarios, hoteles, servicios, eventos y cobros, y el login). Si algo falla, el error
+se muestra en el panel en vez de ocultarse. `localStorage` solo se usa cuando NO hay
+credenciales (modo demo). El panel indica el estado: "● Base de datos conectada".
+
+**Importante:** para que funcione, aplicá el schema en Supabase (ver `supabase/README.md`).
+Si las tablas o policies no están, vas a ver el error exacto y sabrás qué corregir.
+
+Se quitaron las credenciales demo de la pantalla de login. El acceso inicial sigue
+siendo el usuario sembrado por el schema (`admin@demo.com` / `123456`): **cambialo
+apenas entres** (ver `supabase/README.md`).
+
+## 7. Cómo correr
 
 ```bash
 npm install
 npm run dev      # desarrollo
 npm run build    # build de producción
 ```
-
-Usuarios demo: `admin@demo.com` / `123456` (super admin) · `hotel@demo.com` / `123456` (recepción).

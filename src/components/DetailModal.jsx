@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { CATEGORIES, CATEGORY_STYLES, DIFFICULTY_STYLES } from '../data/recommendations';
 import Icon from './Icon';
 
 export default function DetailModal({ rec, onClose, onCheckout }) {
   const category = CATEGORIES.find((item) => item.id === rec.category);
   const categoryStyle = CATEGORY_STYLES[rec.category] || { bg: '#f1e6d2', color: '#6e1f2c' };
+  const [imgLoaded, setImgLoaded] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -28,7 +29,23 @@ export default function DetailModal({ rec, onClose, onCheckout }) {
     >
       <div className="modal-content flex max-h-[93dvh] w-full flex-col overflow-hidden rounded-t-[32px] border border-white/70 bg-white shadow-[0_-18px_70px_rgba(26,18,16,0.20)] md:max-w-2xl md:rounded-[32px]">
         <div className="relative h-60 shrink-0 overflow-hidden bg-[#ede1cd]">
-          <img alt={rec.title} className="h-full w-full object-cover" decoding="async" src={rec.image} />
+          {!imgLoaded && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="h-8 w-8 animate-spin rounded-full border-2 border-[#c49a3f]/40 border-t-[#6e1f2c]" />
+            </div>
+          )}
+          <img
+            alt={rec.title}
+            className={`h-full w-full object-cover transition-opacity duration-300 ${
+              imgLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+            decoding="async"
+            onLoad={() => setImgLoaded(true)}
+            ref={(node) => {
+              if (node?.complete) setImgLoaded(true);
+            }}
+            src={rec.image}
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-[#241915]/45 to-transparent" />
 
           <button

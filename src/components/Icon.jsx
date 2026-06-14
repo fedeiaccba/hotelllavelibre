@@ -183,6 +183,77 @@ const iconPaths = {
       <path d="M5 11v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" />
     </>
   ),
+  key: (
+    <>
+      <circle cx="8.5" cy="8.5" r="4.5" />
+      <path d="m11.8 11.8 8 8" />
+      <path d="m18.4 15.2 1.8-1.8" />
+      <path d="m15.4 18.2 1.8-1.8" />
+    </>
+  ),
+  bell: (
+    <>
+      <path d="M5 17h14" />
+      <path d="M7 17a5 5 0 0 1 10 0" />
+      <path d="M12 7V5" />
+      <circle cx="12" cy="4" r="1" />
+      <path d="M3.5 20h17" />
+    </>
+  ),
+  ticket: (
+    <>
+      <path d="M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2 2 2 0 0 0 0 4 2 2 0 0 1-2 2H6a2 2 0 0 1-2-2 2 2 0 0 0 0-4Z" />
+      <path d="M13.5 6v12" />
+    </>
+  ),
+  coins: (
+    <>
+      <ellipse cx="9" cy="7" rx="6" ry="3" />
+      <path d="M3 7v5c0 1.7 2.7 3 6 3" />
+      <ellipse cx="15" cy="14" rx="6" ry="3" />
+      <path d="M9 14v3c0 1.7 2.7 3 6 3s6-1.3 6-3v-3" />
+    </>
+  ),
+  tag: (
+    <>
+      <path d="M20.6 13.4 12 22l-9-9V4a1 1 0 0 1 1-1h9l7.6 7.6a2 2 0 0 1 0 2.8Z" />
+      <circle cx="7.7" cy="7.7" r="1.3" />
+    </>
+  ),
+  euro: (
+    <>
+      <path d="M16 7.5a5 5 0 1 0 0 9" />
+      <path d="M4.5 10.5H12" />
+      <path d="M4.5 13.5H11" />
+    </>
+  ),
+  trendingUp: (
+    <>
+      <path d="M3 17 9 11l4 4 8-8" />
+      <path d="M16 7h5v5" />
+    </>
+  ),
+  check: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m8.4 12 2.5 2.5 4.7-5.2" />
+    </>
+  ),
+  car: (
+    <>
+      <path d="M3 13l1.8-5A2 2 0 0 1 6.7 6.6h10.6a2 2 0 0 1 1.9 1.4L21 13" />
+      <path d="M4 13h16a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1Z" />
+      <circle cx="7.5" cy="17.5" r="1.3" />
+      <circle cx="16.5" cy="17.5" r="1.3" />
+    </>
+  ),
+  glass: (
+    <>
+      <path d="M5 4h14l-7 8-7-8Z" />
+      <path d="M12 12v6" />
+      <path d="M8 21h8" />
+    </>
+  ),
 };
 
 export default function Icon({ name, size = 18, className = '', strokeWidth = 1.9 }) {

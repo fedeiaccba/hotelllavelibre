@@ -184,3 +184,53 @@ select id, 'FIESA Sand City', 'Temporada verano', 'Cultura', 'Publicado'
 from public.hotels
 where slug = 'hotel-atlantico-albufeira'
   and not exists (select 1 from public.events where title = 'FIESA Sand City');
+
+-- ---------------------------------------------------------------------------
+-- Cobros y comisiones (sistema de cobro manual + comisión fija por reserva)
+-- ---------------------------------------------------------------------------
+
+-- Campos comerciales de cada recomendación / experiencia.
+alter table public.recommendations add column if not exists bookable boolean not null default false;
+alter table public.recommendations add column if not exists price numeric not null default 0;
+alter table public.recommendations add column if not exists commission numeric not null default 0;
+alter table public.recommendations add column if not exists provider text;
+alter table public.recommendations add column if not exists payment_url text;
+
+-- Cada fila es un cobro registrado por un recepcionista (recepción del hotel).
+create table if not exists public.sales (
+  id uuid primary key default gen_random_uuid(),
+  hotel_id uuid not null references public.hotels(id) on delete cascade,
+  recommendation_id uuid references public.recommendations(id) on delete set null,
+  recommendation_title text not null,
+  receptionist_id uuid references public.admin_users(id) on delete set null,
+  receptionist_name text,
+  guest_name text,
+  guest_room text,
+  quantity integer not null default 1,
+  amount numeric not null default 0,
+  commission numeric not null default 0,
+  status text not null default 'Cobrado',
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists sales_hotel_id_idx on public.sales (hotel_id);
+create index if not exists sales_receptionist_id_idx on public.sales (receptionist_id);
+create index if not exists sales_status_idx on public.sales (status);
+create index if not exists sales_created_at_idx on public.sales (created_at);
+
+drop trigger if exists sales_set_updated_at on public.sales;
+create trigger sales_set_updated_at
+before update on public.sales
+for each row execute function public.set_updated_at();
+
+alter table public.sales enable row level security;
+
+drop policy if exists "demo read sales" on public.sales;
+create policy "demo read sales" on public.sales
+for select using (true);
+
+drop policy if exists "demo write sales" on public.sales;
+create policy "demo write sales" on public.sales
+for all using (true) with check (true);

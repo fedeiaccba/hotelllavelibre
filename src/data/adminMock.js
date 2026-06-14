@@ -90,17 +90,68 @@ export const ADMIN_EVENTS = [
   },
 ];
 
+export const SALES = [
+  {
+    id: 1,
+    hotelId: 101,
+    recommendationId: 7,
+    recommendationTitle: 'Avistaje de delfines',
+    receptionistId: 2,
+    receptionistName: 'Recepción Atlântico',
+    guestName: 'Familia Rossi',
+    guestRoom: '204',
+    quantity: 2,
+    amount: 80,
+    commission: 18,
+    status: 'Cobrado',
+    note: 'Salida de la mañana, mar calmo.',
+    createdAt: '2026-06-12T10:20:00.000Z',
+  },
+  {
+    id: 2,
+    hotelId: 101,
+    recommendationId: 2,
+    recommendationTitle: 'Traslado privado al Aeropuerto de Faro',
+    receptionistId: 2,
+    receptionistName: 'Recepción Atlântico',
+    guestName: 'Sr. Müller',
+    guestRoom: '118',
+    quantity: 1,
+    amount: 55,
+    commission: 12,
+    status: 'Cobrado',
+    note: 'Vuelo 18:40.',
+    createdAt: '2026-06-13T18:05:00.000Z',
+  },
+  {
+    id: 3,
+    hotelId: 101,
+    recommendationId: 6,
+    recommendationTitle: 'Gruta de Benagil en barco',
+    receptionistId: 2,
+    receptionistName: 'Recepción Atlântico',
+    guestName: 'Pareja Andersen',
+    guestRoom: '305',
+    quantity: 2,
+    amount: 70,
+    commission: 14,
+    status: 'Pendiente',
+    note: 'Reserva online, confirmar clima.',
+    createdAt: '2026-06-14T09:00:00.000Z',
+  },
+];
+
 export const PLATFORM_SETTINGS = {
   categories: CATEGORIES.filter((category) => category.id !== 'todos').map((category) => ({
     ...category,
     status: 'Activa',
     visible: true,
   })),
-  recommendations: RECOMMENDATIONS.map((recommendation, index) => ({
+  recommendations: RECOMMENDATIONS.map((recommendation) => ({
     ...recommendation,
     hotelId: 101,
-    status: index < 7 ? 'Publicado' : 'Borrador',
-    featured: index < 3,
+    status: 'Publicado',
+    featured: Boolean(recommendation.featured),
   })),
 };
 

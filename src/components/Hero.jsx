@@ -5,14 +5,14 @@ export default function Hero({ hotel }) {
 
   return (
     <section className="mx-auto max-w-7xl px-4 pb-6 pt-5 sm:px-6 sm:pb-8 lg:px-8">
-      <div className="relative overflow-hidden rounded-[32px] bg-[#d9cee9] shadow-[0_24px_70px_rgba(96,75,132,0.18)] sm:rounded-[36px]">
+      <div className="relative overflow-hidden rounded-[32px] bg-[#e4d5bd] shadow-[0_24px_70px_rgba(94,26,42,0.18)] sm:rounded-[36px]">
         <img
           alt="Costa turistica del Algarve cerca del hotel"
           className="absolute inset-0 h-full w-full object-cover"
           src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&q=88"
         />
-        <div className="absolute inset-0 bg-[linear-gradient(110deg,rgba(36,30,53,0.78)_0%,rgba(58,46,78,0.46)_48%,rgba(255,255,255,0.10)_100%)]" />
-        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#241e35]/60 to-transparent" />
+        <div className="absolute inset-0 bg-[linear-gradient(110deg,rgba(40,25,20,0.78)_0%,rgba(70,45,35,0.46)_48%,rgba(255,255,255,0.10)_100%)]" />
+        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#241915]/60 to-transparent" />
 
         <div className="relative z-10 flex min-h-[360px] flex-col justify-between p-5 sm:min-h-[430px] sm:p-8 lg:p-10">
           <div className="flex flex-wrap items-center gap-2">
@@ -27,12 +27,15 @@ export default function Hero({ hotel }) {
           </div>
 
           <div className="max-w-2xl">
-            <p className="mb-3 text-sm font-medium text-white/78">Guia local para tu estadia</p>
-            <h1 className="text-[2.15rem] font-semibold leading-[1.05] tracking-normal text-white sm:text-5xl lg:text-6xl">
-              Descubri que hacer cerca de tu hotel
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-[#ecca80]">
+              Conserjería · Guía local para tu estadía
+            </p>
+            <h1 className="font-display text-[2.3rem] font-semibold leading-[1.04] tracking-tight text-white sm:text-5xl lg:text-6xl">
+              Descubrí qué hacer cerca de tu hotel
             </h1>
-            <p className="mt-4 max-w-xl text-base leading-7 text-white/82 sm:text-lg">
-              Recomendaciones seleccionadas para disfrutar mejor tu estadia.
+            <span className="mt-5 block h-px w-24 bg-gradient-to-r from-[#e8c879] to-transparent" />
+            <p className="mt-4 max-w-xl text-base leading-7 text-white/85 sm:text-lg">
+              Una selección de experiencias del conserje, pensada para que disfrutes mejor tu estadía.
             </p>
           </div>
         </div>

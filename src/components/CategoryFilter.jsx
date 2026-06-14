@@ -12,8 +12,8 @@ export default function CategoryFilter({ active, onChange }) {
             className={[
               'inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-semibold transition active:scale-[0.98]',
               isActive
-                ? 'border-[#6f5c92] bg-[#6f5c92] text-white shadow-[0_12px_26px_rgba(111,92,146,0.22)]'
-                : 'border-[#e7ddf2] bg-white/80 text-[#6f6a7f] shadow-sm hover:border-[#cfc0df] hover:text-[#4f4562]',
+                ? 'border-[#6e1f2c] bg-[#6e1f2c] text-white shadow-[0_12px_26px_rgba(94,26,42,0.22)]'
+                : 'border-[#e6d7bf] bg-white/80 text-[#7c6a5e] shadow-sm hover:border-[#cbb389] hover:text-[#4a342a]',
             ].join(' ')}
             key={category.id}
             onClick={() => onChange(category.id)}

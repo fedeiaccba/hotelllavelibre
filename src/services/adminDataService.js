@@ -1,10 +1,11 @@
-import { ADMIN_EVENTS, ADMIN_USERS, HOTELS, PLATFORM_SETTINGS } from '../data/adminMock';
+import { ADMIN_EVENTS, ADMIN_USERS, HOTELS, PLATFORM_SETTINGS, SALES } from '../data/adminMock';
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient';
 
 const LOCAL_ADMIN_USERS_KEY = 'gringacho_admin_users';
 const LOCAL_EVENTS_KEY = 'gringacho_events';
 const LOCAL_HOTELS_KEY = 'gringacho_hotels';
 const LOCAL_RECOMMENDATIONS_KEY = 'gringacho_recommendations';
+const LOCAL_SALES_KEY = 'gringacho_sales';
 
 function toAdminUserRow(user) {
   return {
@@ -75,6 +76,11 @@ function toRecommendationRow(recommendation) {
     map_url: recommendation.mapUrl,
     status: recommendation.status,
     featured: Boolean(recommendation.featured),
+    bookable: Boolean(recommendation.bookable),
+    price: Number(recommendation.price) || 0,
+    commission: Number(recommendation.commission) || 0,
+    provider: recommendation.provider || '',
+    payment_url: recommendation.paymentUrl || '',
     tips: recommendation.tips || [],
   };
 }
@@ -97,6 +103,11 @@ function fromRecommendationRow(row) {
     mapUrl: row.map_url || '',
     status: row.status || 'Publicado',
     featured: Boolean(row.featured),
+    bookable: Boolean(row.bookable),
+    price: Number(row.price) || 0,
+    commission: Number(row.commission) || 0,
+    provider: row.provider || '',
+    paymentUrl: row.payment_url || '',
     tips: row.tips || [],
   };
 }
@@ -119,6 +130,42 @@ function fromEventRow(row) {
     date: row.date,
     category: row.category,
     status: row.status || 'Publicado',
+  };
+}
+
+function toSaleRow(sale) {
+  return {
+    hotel_id: sale.hotelId,
+    recommendation_id: sale.recommendationId || null,
+    recommendation_title: sale.recommendationTitle,
+    receptionist_id: sale.receptionistId || null,
+    receptionist_name: sale.receptionistName,
+    guest_name: sale.guestName || '',
+    guest_room: sale.guestRoom || '',
+    quantity: Number(sale.quantity) || 1,
+    amount: Number(sale.amount) || 0,
+    commission: Number(sale.commission) || 0,
+    status: sale.status || 'Cobrado',
+    note: sale.note || '',
+  };
+}
+
+function fromSaleRow(row) {
+  return {
+    id: row.id,
+    hotelId: row.hotel_id,
+    recommendationId: row.recommendation_id,
+    recommendationTitle: row.recommendation_title || '',
+    receptionistId: row.receptionist_id,
+    receptionistName: row.receptionist_name || '',
+    guestName: row.guest_name || '',
+    guestRoom: row.guest_room || '',
+    quantity: Number(row.quantity) || 1,
+    amount: Number(row.amount) || 0,
+    commission: Number(row.commission) || 0,
+    status: row.status || 'Cobrado',
+    note: row.note || '',
+    createdAt: row.created_at || row.createdAt || null,
   };
 }
 
@@ -365,6 +412,12 @@ export async function deleteHotel(id) {
     events.filter((event) => String(event.hotelId) !== String(id)),
   );
 
+  const sales = readLocal(LOCAL_SALES_KEY, SALES);
+  writeLocal(
+    LOCAL_SALES_KEY,
+    sales.filter((sale) => String(sale.hotelId) !== String(id)),
+  );
+
   const users = readLocal(LOCAL_ADMIN_USERS_KEY, ADMIN_USERS);
   writeLocal(
     LOCAL_ADMIN_USERS_KEY,
@@ -532,5 +585,104 @@ export async function deleteEvent(id) {
   writeLocal(
     LOCAL_EVENTS_KEY,
     events.filter((event) => String(event.id) !== String(id)),
+  );
+}
+
+export async function listSales() {
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from('sales')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data.map(fromSaleRow);
+    } catch {
+      return readLocal(LOCAL_SALES_KEY, SALES);
+    }
+  }
+
+  return readLocal(LOCAL_SALES_KEY, SALES);
+}
+
+export async function createSale(payload) {
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from('sales')
+        .insert(toSaleRow(payload))
+        .select()
+        .single();
+
+      if (error) throw error;
+      return fromSaleRow(data);
+    } catch {
+      // Fall through to the local demo store when the optional Supabase table is not applied yet.
+    }
+  }
+
+  const sales = readLocal(LOCAL_SALES_KEY, SALES);
+  const created = {
+    ...payload,
+    id: makeId('sale'),
+    quantity: Number(payload.quantity) || 1,
+    amount: Number(payload.amount) || 0,
+    commission: Number(payload.commission) || 0,
+    status: payload.status || 'Cobrado',
+    createdAt: payload.createdAt || new Date().toISOString(),
+  };
+  writeLocal(LOCAL_SALES_KEY, [created, ...sales]);
+  return created;
+}
+
+export async function updateSale(id, payload) {
+  if (isSupabaseConfigured) {
+    try {
+      const { data, error } = await supabase
+        .from('sales')
+        .update(toSaleRow(payload))
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return fromSaleRow(data);
+    } catch {
+      // Fall through to the local demo store when the optional Supabase table is not applied yet.
+    }
+  }
+
+  const sales = readLocal(LOCAL_SALES_KEY, SALES);
+  const updated = sales.map((sale) =>
+    String(sale.id) === String(id)
+      ? {
+          ...sale,
+          ...payload,
+          quantity: Number(payload.quantity) || 1,
+          amount: Number(payload.amount) || 0,
+          commission: Number(payload.commission) || 0,
+        }
+      : sale,
+  );
+  writeLocal(LOCAL_SALES_KEY, updated);
+  return updated.find((sale) => String(sale.id) === String(id));
+}
+
+export async function deleteSale(id) {
+  if (isSupabaseConfigured) {
+    try {
+      const { error } = await supabase.from('sales').delete().eq('id', id);
+      if (error) throw error;
+      return;
+    } catch {
+      // Fall through to the local demo store when the optional Supabase table is not applied yet.
+    }
+  }
+
+  const sales = readLocal(LOCAL_SALES_KEY, SALES);
+  writeLocal(
+    LOCAL_SALES_KEY,
+    sales.filter((sale) => String(sale.id) !== String(id)),
   );
 }

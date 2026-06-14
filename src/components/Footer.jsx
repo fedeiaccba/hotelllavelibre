@@ -14,19 +14,19 @@ export default function Footer({ hotel }) {
         <div className="flex items-center justify-center gap-3 sm:justify-start">
           <BrandMark />
           <div>
-            <p className="text-sm font-semibold text-[#242130]">
+            <p className="font-display text-[15px] font-semibold text-[#2a1d18]">
               {hotel?.name || 'Hotel Atlantico Albufeira'}
             </p>
-            <p className="text-xs text-[#8e86a5]">Tu guia local durante la estadia</p>
+            <p className="text-xs text-[#9a877a]">Tu conserje local durante la estadía</p>
           </div>
         </div>
 
-        <p className="text-xs leading-5 text-[#8e86a5] sm:text-right lg:text-center">
+        <p className="text-xs leading-5 text-[#9a877a] sm:text-right lg:text-center">
           {location} · {new Date().getFullYear()}
         </p>
 
         <button
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[#071521] px-5 text-sm font-semibold text-[#f3d190] shadow-[0_14px_30px_rgba(7,21,33,0.18)] transition hover:bg-[#0d2130] active:scale-[0.98]"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[#1a1210] px-5 text-sm font-semibold text-[#ecca80] shadow-[0_14px_30px_rgba(26,18,16,0.18)] transition hover:bg-[#241915] active:scale-[0.98]"
           onClick={joinPlatform}
           type="button"
         >

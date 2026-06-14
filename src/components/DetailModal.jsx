@@ -2,9 +2,9 @@ import { useEffect } from 'react';
 import { CATEGORIES, CATEGORY_STYLES, DIFFICULTY_STYLES } from '../data/recommendations';
 import Icon from './Icon';
 
-export default function DetailModal({ rec, onClose }) {
+export default function DetailModal({ rec, onClose, onCheckout }) {
   const category = CATEGORIES.find((item) => item.id === rec.category);
-  const categoryStyle = CATEGORY_STYLES[rec.category] || CATEGORY_STYLES.informacion;
+  const categoryStyle = CATEGORY_STYLES[rec.category] || { bg: '#f1e6d2', color: '#6e1f2c' };
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -21,19 +21,19 @@ export default function DetailModal({ rec, onClose }) {
 
   return (
     <div
-      className="modal-backdrop fixed inset-0 z-50 flex items-end justify-center bg-[#211b2f]/60 p-0 backdrop-blur-md md:items-center md:p-4"
+      className="modal-backdrop fixed inset-0 z-50 flex items-end justify-center bg-[#1a1210]/60 p-0 backdrop-blur-md md:items-center md:p-4"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="modal-content flex max-h-[93dvh] w-full flex-col overflow-hidden rounded-t-[32px] border border-white/70 bg-white shadow-[0_-18px_70px_rgba(30,23,45,0.20)] md:max-w-2xl md:rounded-[32px]">
-        <div className="relative h-60 shrink-0 overflow-hidden bg-[#ece5f4]">
-          <img alt={rec.title} className="h-full w-full object-cover" src={rec.image} />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#221c30]/45 to-transparent" />
+      <div className="modal-content flex max-h-[93dvh] w-full flex-col overflow-hidden rounded-t-[32px] border border-white/70 bg-white shadow-[0_-18px_70px_rgba(26,18,16,0.20)] md:max-w-2xl md:rounded-[32px]">
+        <div className="relative h-60 shrink-0 overflow-hidden bg-[#ede1cd]">
+          <img alt={rec.title} className="h-full w-full object-cover" decoding="async" src={rec.image} />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#241915]/45 to-transparent" />
 
           <button
             aria-label="Cerrar"
-            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/92 text-[#4f4562] shadow-sm transition hover:bg-white"
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/92 text-[#4a342a] shadow-sm transition hover:bg-white"
             onClick={onClose}
             type="button"
           >
@@ -50,14 +50,14 @@ export default function DetailModal({ rec, onClose }) {
         </div>
 
         <div className="flex-1 overflow-y-auto overscroll-contain p-6 sm:p-7">
-          <p className="text-xs font-semibold text-[#9a91aa]">{rec.subtitle}</p>
-          <h2 className="mt-2 text-2xl font-semibold leading-tight tracking-normal text-[#242130] sm:text-3xl">
+          <p className="text-xs font-semibold text-[#a8978b]">{rec.subtitle}</p>
+          <h2 className="mt-2 text-2xl font-semibold leading-tight tracking-normal text-[#2a1d18] sm:text-3xl">
             {rec.title}
           </h2>
 
           <div className="mt-5 flex flex-wrap gap-2">
-            <MetaBlock icon="mapPin" title="Distancia" value={rec.distance} />
-            <MetaBlock icon="clock" title="Duración" value={rec.duration} />
+            {rec.duration && <MetaBlock icon="clock" title="Duración" value={rec.duration} />}
+            {rec.provider && <MetaBlock icon="shield" title="Proveedor" value={rec.provider} />}
             {rec.difficulty && (
               <MetaBlock
                 icon="mountain"
@@ -70,8 +70,40 @@ export default function DetailModal({ rec, onClose }) {
 
           <section className="mt-7">
             <SectionLabel>Descripción</SectionLabel>
-            <p className="text-sm leading-7 text-[#625d70]">{rec.fullDescription}</p>
+            <p className="text-sm leading-7 text-[#7c6a5e]">{rec.fullDescription}</p>
           </section>
+
+          {rec.bookable && (
+            <section className="mt-7 overflow-hidden rounded-[24px] border border-[#c49a3f]/35 bg-[linear-gradient(135deg,#fbf5ea_0%,#f4e9d4_100%)] p-5">
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#6e1f2c]">
+                    <Icon name="key" size={15} />
+                    Reservá y pagá online
+                  </p>
+                  {rec.provider && (
+                    <p className="mt-2 truncate text-sm font-medium text-[#7c6a5e]">{rec.provider}</p>
+                  )}
+                </div>
+                {rec.price > 0 && (
+                  <div className="shrink-0 text-right">
+                    <p className="font-display text-2xl font-bold text-[#2a1d18]">€{rec.price}</p>
+                  </div>
+                )}
+              </div>
+              <button
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#6e1f2c] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(94,26,42,0.22)] transition hover:bg-[#561420] active:scale-[0.98]"
+                onClick={() => onCheckout(rec)}
+                type="button"
+              >
+                Reservar y pagar €{rec.price}
+                <Icon name="arrowRight" size={16} />
+              </button>
+              <p className="mt-3 text-xs leading-5 text-[#7c6a5e]">
+                Reservá desde tu teléfono. La recepción del hotel coordina y confirma tu reserva.
+              </p>
+            </section>
+          )}
 
           <section className="mt-7 grid gap-3 sm:grid-cols-2">
             <InfoRow icon="mapPin" label="Ubicación" value={rec.location} />
@@ -83,8 +115,8 @@ export default function DetailModal({ rec, onClose }) {
               <SectionLabel>Consejos útiles</SectionLabel>
               <ul className="space-y-2.5">
                 {rec.tips.map((tip) => (
-                  <li className="flex gap-3 text-sm leading-6 text-[#625d70]" key={tip}>
-                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#9b86bd]" />
+                  <li className="flex gap-3 text-sm leading-6 text-[#7c6a5e]" key={tip}>
+                    <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#c49a3f]" />
                     <span>{tip}</span>
                   </li>
                 ))}
@@ -93,13 +125,13 @@ export default function DetailModal({ rec, onClose }) {
           )}
 
           <a
-            className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#6f5c92] px-5 py-3.5 text-sm font-semibold text-white no-underline shadow-[0_14px_30px_rgba(111,92,146,0.22)] transition hover:bg-[#5d4d7c]"
+            className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#e6d7bf] px-5 py-3.5 text-sm font-semibold text-[#6e1f2c] no-underline transition hover:border-[#cbb389]"
             href={rec.mapUrl}
             rel="noopener noreferrer"
             target="_blank"
           >
-            Abrir en Google Maps
-            <Icon name="arrowRight" size={16} />
+            <Icon name="mapPin" size={16} />
+            Cómo llegar
           </a>
         </div>
       </div>
@@ -109,7 +141,7 @@ export default function DetailModal({ rec, onClose }) {
 
 function SectionLabel({ children }) {
   return (
-    <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#6f5c92]">
+    <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#6e1f2c]">
       {children}
     </h3>
   );
@@ -118,26 +150,26 @@ function SectionLabel({ children }) {
 function MetaBlock({ icon, title, value, style }) {
   return (
     <div
-      className="min-w-0 rounded-[20px] border border-[#efe7f6] bg-[#faf7ff] px-4 py-3"
+      className="min-w-0 rounded-[20px] border border-[#ece0cc] bg-[#fbf5ea] px-4 py-3"
       style={style ? { backgroundColor: style.bg, color: style.color } : undefined}
     >
-      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9a91aa]">
+      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#a8978b]">
         <Icon name={icon} size={14} />
         {title}
       </div>
-      <p className="mt-1 max-w-[12rem] truncate text-sm font-semibold text-[#242130]">{value}</p>
+      <p className="mt-1 max-w-[12rem] truncate text-sm font-semibold text-[#2a1d18]">{value}</p>
     </div>
   );
 }
 
 function InfoRow({ icon, label, value }) {
   return (
-    <div className="min-w-0 rounded-[22px] border border-[#efe7f6] bg-[#fbf8ff] p-4">
-      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#9a91aa]">
+    <div className="min-w-0 rounded-[22px] border border-[#ece0cc] bg-[#fbf5ea] p-4">
+      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#a8978b]">
         <Icon name={icon} size={14} />
         {label}
       </div>
-      <p className="mt-2 break-words text-sm font-medium leading-6 text-[#242130]">{value}</p>
+      <p className="mt-2 break-words text-sm font-medium leading-6 text-[#2a1d18]">{value}</p>
     </div>
   );
 }

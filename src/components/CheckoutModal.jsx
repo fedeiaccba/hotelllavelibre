@@ -47,7 +47,7 @@ export default function CheckoutModal({ rec, onClose, onConfirm, autoCharge = fa
 
   return (
     <div
-      className="modal-backdrop fixed inset-0 z-50 flex items-end justify-center bg-[#1a1210]/60 p-0 backdrop-blur-md md:items-center md:p-4"
+      className="modal-backdrop fixed inset-0 z-50 flex items-end justify-center bg-[#1a1210]/70 p-0 md:items-center md:p-4"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}

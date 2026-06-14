@@ -1469,7 +1469,7 @@ function SchemaPanel({ onClose }) {
 
 function CrudModal({ children, onClose, title }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1a1210]/60 p-0 backdrop-blur-md sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#1a1210]/70 p-0 sm:items-center sm:p-4">
       <div className="max-h-[92dvh] w-full overflow-y-auto rounded-t-[32px] border border-white/70 bg-white p-5 shadow-[0_-18px_70px_rgba(26,18,16,0.20)] sm:max-w-3xl sm:rounded-[32px] sm:p-6">
         <div className="mb-5 flex items-center justify-between gap-4">
           <h2 className="text-2xl font-semibold text-[#2a1d18]">{title}</h2>

@@ -21,7 +21,7 @@ export default function DetailModal({ rec, onClose, onCheckout }) {
 
   return (
     <div
-      className="modal-backdrop fixed inset-0 z-50 flex items-end justify-center bg-[#1a1210]/60 p-0 backdrop-blur-md md:items-center md:p-4"
+      className="modal-backdrop fixed inset-0 z-50 flex items-end justify-center bg-[#1a1210]/70 p-0 md:items-center md:p-4"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -41,7 +41,7 @@ export default function DetailModal({ rec, onClose, onCheckout }) {
           </button>
 
           <span
-            className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur-md"
+            className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm"
             style={{ backgroundColor: categoryStyle.bg, color: categoryStyle.color }}
           >
             <Icon name={category?.icon} size={14} />

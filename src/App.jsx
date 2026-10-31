@@ -1,19 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CATEGORIES, RECOMMENDATIONS } from './data/recommendations';
-import AboutZone from './components/AboutZone';
+import { CATEGORIES } from './data/recommendations';
 import CategoryFilter from './components/CategoryFilter';
 import CheckoutModal from './components/CheckoutModal';
 import DetailModal from './components/DetailModal';
 import Footer from './components/Footer';
 import Hero from './components/Hero';
-import HotelBranding from './components/HotelBranding';
 import Navbar from './components/Navbar';
 import RecommendationCard from './components/RecommendationCard';
 import SearchBar from './components/SearchBar';
 import AdminDashboard from './components/admin/AdminDashboard';
 import AdminLogin from './components/admin/AdminLogin';
 import { getSessionUser } from './data/adminMock';
-import { createSale, listHotels, listRecommendations } from './services/adminDataService';
+import { createGuestBooking, listHotels, listRecommendations } from './services/adminDataService';
+import { isSupabaseConfigured } from './lib/supabaseClient';
 import './index.css';
 
 export default function App() {
@@ -40,9 +39,11 @@ export default function App() {
 function PublicGuide() {
   const path = window.location.pathname;
   const [search, setSearch] = useState('');
-  const [activeCategory, setCategory] = useState('todos');
+  const [activeCategory, setCategory] = useState('excursion');
   const [hotels, setHotels] = useState([]);
-  const [recommendations, setRecommendations] = useState(RECOMMENDATIONS);
+  const [recommendations, setRecommendations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [selectedRec, setSelectedRec] = useState(null);
   const [checkoutRec, setCheckoutRec] = useState(null);
 
@@ -57,12 +58,10 @@ function PublicGuide() {
           (item) => !item.status || item.status === 'Publicado',
         );
         setHotels(hotelData);
-        setRecommendations(
-          publishedRecommendations.length >= 3 ? recommendationData : RECOMMENDATIONS,
-        );
+        setRecommendations(publishedRecommendations);
       } catch {
-        setRecommendations(RECOMMENDATIONS);
-      }
+        setLoadError('No pudimos cargar las experiencias. Volvé a cargar la página.');
+      } finally { setLoading(false); }
     }
 
     loadPublicData();
@@ -70,7 +69,7 @@ function PublicGuide() {
 
   const activeHotel = useMemo(() => {
     const slug = path.startsWith('/h/') ? decodeURIComponent(path.split('/h/')[1]?.split('/')[0] || '') : '';
-    return hotels.find((hotel) => hotel.slug === slug) || hotels[0] || null;
+    return slug ? hotels.find((hotel) => hotel.slug === slug) || null : hotels[0] || null;
   }, [hotels, path]);
   const activeHotelId = activeHotel?.id;
 
@@ -80,7 +79,7 @@ function PublicGuide() {
     return recommendations
       .filter((item) => {
         const matchesHotel =
-          !activeHotelId || !item.hotelId || String(item.hotelId) === String(activeHotelId);
+          activeHotelId && String(item.hotelId) === String(activeHotelId);
         const isPublished = !item.status || item.status === 'Publicado';
         const matchesCategory = activeCategory === 'todos' || item.category === activeCategory;
         const matchesSearch =
@@ -96,7 +95,10 @@ function PublicGuide() {
       .sort(
         (a, b) =>
           Number(Boolean(b.featured)) - Number(Boolean(a.featured)) ||
-          (Number(b.commission) || 0) - (Number(a.commission) || 0),
+          ((Number(b.receptionistCommission ?? b.commission) || 0) +
+            (Number(b.systemCommission) || 0)) -
+            ((Number(a.receptionistCommission ?? a.commission) || 0) +
+              (Number(a.systemCommission) || 0)),
       );
   }, [activeCategory, activeHotelId, recommendations, search]);
 
@@ -104,8 +106,9 @@ function PublicGuide() {
     CATEGORIES.find((category) => category.id === activeCategory)?.label || 'Servicios';
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top_left,#f7f1e6_0,#f3e9d8_34%,#f2e7d4_68%,#fbf6ec_100%)] text-[#2a1d18]">
+    <div className="public-catalog min-h-screen overflow-x-hidden bg-white text-[#243b39]">
       <Navbar hotel={activeHotel} />
+      {!isSupabaseConfigured && <p className="demo-notice">Catálogo de demostración · Las solicitudes se guardan solo en este navegador.</p>}
 
       <main className="overflow-x-hidden">
         <Hero hotel={activeHotel} />
@@ -123,10 +126,10 @@ function PublicGuide() {
           <div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-end sm:justify-between">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9a877a]">
-                Servicios del hotel
+                Experiencias y alquileres
               </p>
               <h2 className="mt-2 font-display text-2xl font-semibold tracking-tight text-[#2a1d18] sm:text-3xl">
-                {activeLabel === 'Todos' ? 'Reservá y pagá tu estadía' : activeLabel}
+                {activeLabel === 'Todos' ? 'Todas las experiencias' : activeLabel}
               </h2>
             </div>
             <span className="w-fit rounded-full border border-[#e6d7bf] bg-white/80 px-4 py-2 text-sm font-semibold text-[#6e1f2c] shadow-sm">
@@ -134,7 +137,7 @@ function PublicGuide() {
             </span>
           </div>
 
-          {filtered.length > 0 ? (
+          {loading ? <p role="status">Cargando experiencias...</p> : loadError ? <p role="alert">{loadError}</p> : !activeHotel ? <p>Este hotel no está disponible.</p> : filtered.length > 0 ? (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
               {filtered.map((rec, index) => (
                 <RecommendationCard
@@ -157,8 +160,6 @@ function PublicGuide() {
           )}
         </section>
 
-        <HotelBranding hotel={activeHotel} />
-        <AboutZone />
       </main>
 
       <Footer hotel={activeHotel} />
@@ -176,26 +177,10 @@ function PublicGuide() {
 
       {checkoutRec && (
         <CheckoutModal
-          autoCharge={Boolean(activeHotel?.autoCharge)}
+          hotel={activeHotel}
           rec={checkoutRec}
           onClose={() => setCheckoutRec(null)}
-          onConfirm={async ({ guestName, guestRoom, quantity, amount }) => {
-            const auto = Boolean(activeHotel?.autoCharge);
-            await createSale({
-              hotelId: activeHotel?.id || checkoutRec.hotelId || null,
-              recommendationId: checkoutRec.id,
-              recommendationTitle: checkoutRec.title,
-              receptionistId: null,
-              receptionistName: 'Reserva web',
-              guestName,
-              guestRoom,
-              quantity,
-              amount,
-              commission: (Number(checkoutRec.commission) || 0) * quantity,
-              status: auto ? 'Cobrado' : 'Pendiente',
-              note: auto ? 'Reserva online (cobro automático)' : 'Reserva online del huésped',
-            });
-          }}
+          onConfirm={(form) => createGuestBooking(checkoutRec.id, form, activeHotel?.id)}
         />
       )}
     </div>

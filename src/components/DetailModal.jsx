@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CATEGORIES, CATEGORY_STYLES, DIFFICULTY_STYLES } from '../data/recommendations';
 import Icon from './Icon';
+import { isRental } from '../lib/booking';
 
 export default function DetailModal({ rec, onClose, onCheckout }) {
   const category = CATEGORIES.find((item) => item.id === rec.category);
@@ -96,7 +97,7 @@ export default function DetailModal({ rec, onClose, onCheckout }) {
                 <div className="min-w-0">
                   <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#6e1f2c]">
                     <Icon name="key" size={15} />
-                    Reservá y pagá online
+                    Reserva de experiencia
                   </p>
                   {rec.provider && (
                     <p className="mt-2 truncate text-sm font-medium text-[#7c6a5e]">{rec.provider}</p>
@@ -104,7 +105,7 @@ export default function DetailModal({ rec, onClose, onCheckout }) {
                 </div>
                 {rec.price > 0 && (
                   <div className="shrink-0 text-right">
-                    <p className="font-display text-2xl font-bold text-[#2a1d18]">€{rec.price}</p>
+                    <p className="font-display text-2xl font-bold text-[#2a1d18]">€{rec.price}{isRental(rec) ? ' / día' : ''}</p>
                   </div>
                 )}
               </div>
@@ -113,11 +114,11 @@ export default function DetailModal({ rec, onClose, onCheckout }) {
                 onClick={() => onCheckout(rec)}
                 type="button"
               >
-                Reservar y pagar €{rec.price}
+                Solicitar reserva
                 <Icon name="arrowRight" size={16} />
               </button>
               <p className="mt-3 text-xs leading-5 text-[#7c6a5e]">
-                Reservá desde tu teléfono. La recepción del hotel coordina y confirma tu reserva.
+                Elegí una fecha y recibí tu cupón. Disponibilidad sujeta a confirmación de la empresa.
               </p>
             </section>
           )}

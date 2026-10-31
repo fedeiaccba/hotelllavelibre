@@ -1,6 +1,8 @@
 -- LlaveLibre — schema idempotente y AUTO-REPARABLE.
 -- Se puede correr varias veces. Si ya existían tablas viejas (de otra versión),
 -- este script les agrega las columnas que falten en vez de fallar.
+-- SOLO PRUEBAS: usuarios con password de ejemplo y politicas RLS abiertas.
+-- No cargar datos personales reales ni usar para operar dinero real.
 -- Pegar TODO en Supabase → SQL Editor → Run.
 
 create extension if not exists "pgcrypto";
@@ -90,6 +92,9 @@ create table if not exists public.recommendations (
   featured boolean not null default false,
   bookable boolean not null default false,
   price numeric not null default 0,
+  provider_cost numeric not null default 0,
+  receptionist_commission numeric not null default 0,
+  system_commission numeric not null default 0,
   commission numeric not null default 0,
   provider text,
   payment_url text,
@@ -114,6 +119,9 @@ alter table public.recommendations add column if not exists status text default 
 alter table public.recommendations add column if not exists featured boolean default false;
 alter table public.recommendations add column if not exists bookable boolean default false;
 alter table public.recommendations add column if not exists price numeric default 0;
+alter table public.recommendations add column if not exists provider_cost numeric default 0;
+alter table public.recommendations add column if not exists receptionist_commission numeric default 0;
+alter table public.recommendations add column if not exists system_commission numeric default 0;
 alter table public.recommendations add column if not exists commission numeric default 0;
 alter table public.recommendations add column if not exists provider text;
 alter table public.recommendations add column if not exists payment_url text;
@@ -152,6 +160,9 @@ create table if not exists public.sales (
   guest_room text,
   quantity integer not null default 1,
   amount numeric not null default 0,
+  provider_amount numeric not null default 0,
+  receptionist_commission numeric not null default 0,
+  system_commission numeric not null default 0,
   commission numeric not null default 0,
   status text not null default 'Cobrado',
   note text,
@@ -167,11 +178,52 @@ alter table public.sales add column if not exists guest_name text;
 alter table public.sales add column if not exists guest_room text;
 alter table public.sales add column if not exists quantity integer default 1;
 alter table public.sales add column if not exists amount numeric default 0;
+alter table public.sales add column if not exists provider_amount numeric default 0;
+alter table public.sales add column if not exists receptionist_commission numeric default 0;
+alter table public.sales add column if not exists system_commission numeric default 0;
 alter table public.sales add column if not exists commission numeric default 0;
 alter table public.sales add column if not exists status text default 'Cobrado';
 alter table public.sales add column if not exists note text;
 alter table public.sales add column if not exists created_at timestamptz default now();
 alter table public.sales add column if not exists updated_at timestamptz default now();
+alter table public.sales add column if not exists booking_code text;
+alter table public.sales add column if not exists booking_status text;
+alter table public.sales add column if not exists payment_method text;
+alter table public.sales add column if not exists guest_contact text;
+alter table public.sales add column if not exists service_date date;
+alter table public.sales add column if not exists service_time time;
+alter table public.sales add column if not exists end_date date;
+alter table public.sales add column if not exists end_time time;
+alter table public.sales add column if not exists pickup_location text;
+alter table public.sales add column if not exists expires_at timestamptz;
+alter table public.sales add column if not exists paid_at timestamptz;
+alter table public.sales add column if not exists collected_by text;
+create unique index if not exists sales_booking_code_uidx on public.sales (booking_code);
+
+-- Migracion suave para datos anteriores al desglose recepcion/sistema.
+update public.recommendations
+set
+  receptionist_commission = coalesce(nullif(receptionist_commission, 0), commission, 0),
+  system_commission = coalesce(system_commission, 0),
+  provider_cost = case
+    when coalesce(provider_cost, 0) > 0 then provider_cost
+    else greatest(coalesce(price, 0) - coalesce(commission, 0), 0)
+  end
+where coalesce(receptionist_commission, 0) = 0
+  and coalesce(system_commission, 0) = 0
+  and coalesce(commission, 0) > 0;
+
+update public.sales
+set
+  receptionist_commission = coalesce(nullif(receptionist_commission, 0), commission, 0),
+  system_commission = coalesce(system_commission, 0),
+  provider_amount = case
+    when coalesce(provider_amount, 0) > 0 then provider_amount
+    else greatest(coalesce(amount, 0) - coalesce(commission, 0), 0)
+  end
+where coalesce(receptionist_commission, 0) = 0
+  and coalesce(system_commission, 0) = 0
+  and coalesce(commission, 0) > 0;
 
 -- ===========================================================================
 -- ÍNDICES
@@ -260,6 +312,10 @@ create policy "demo read sales" on public.sales for select using (true);
 drop policy if exists "demo write sales" on public.sales;
 create policy "demo write sales" on public.sales for all using (true) with check (true);
 
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on public.admin_users, public.hotels,
+  public.recommendations, public.events, public.sales to anon, authenticated;
+
 -- ===========================================================================
 -- DATOS INICIALES (bootstrap). Usan WHERE NOT EXISTS, así no dependen de
 -- constraints y no duplican si ya existen.
@@ -273,8 +329,8 @@ select
   'Activo',
   'Recepción Atlântico',
   '/h/hotel-atlantico-albufeira',
-  1842,
-  true
+  0,
+  false
 where not exists (select 1 from public.hotels where slug = 'hotel-atlantico-albufeira');
 
 insert into public.admin_users (name, email, password, role, hotel_id, status)

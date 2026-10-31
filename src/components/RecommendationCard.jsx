@@ -1,5 +1,6 @@
 import { CATEGORIES, CATEGORY_STYLES, DIFFICULTY_STYLES } from '../data/recommendations';
 import Icon from './Icon';
+import { isRental } from '../lib/booking';
 
 const FALLBACKS = {
   restaurante: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1000&q=80',
@@ -44,7 +45,7 @@ export default function RecommendationCard({ rec, index, onCheckout, onSelect })
         {rec.bookable && rec.price > 0 && (
           <span className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full border border-[#c49a3f]/40 bg-[#1a1210] px-3 py-1.5 text-xs font-bold text-[#ecca80] shadow-sm">
             <Icon name="tag" size={13} />
-            €{rec.price}
+            €{rec.price}{isRental(rec) ? ' / día' : rec.category === 'taxi' ? ' / vehículo' : ''}
           </span>
         )}
       </div>
@@ -80,7 +81,7 @@ export default function RecommendationCard({ rec, index, onCheckout, onSelect })
               onClick={() => onCheckout(rec)}
               type="button"
             >
-              Reservar y pagar €{rec.price}
+              Solicitar reserva
             </button>
             <button
               className="inline-flex shrink-0 items-center justify-center rounded-full border border-[#e6d7bf] px-4 py-3 text-sm font-semibold text-[#6e1f2c] transition hover:border-[#cbb389]"

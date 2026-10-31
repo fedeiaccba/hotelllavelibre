@@ -30,7 +30,7 @@ export default function Footer({ hotel }) {
           onClick={joinPlatform}
           type="button"
         >
-          Unite a LlaveLibre
+          Acceso recepción
           <Icon name="arrowRight" size={16} />
         </button>
       </div>

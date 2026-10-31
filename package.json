@@ -7,6 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "test": "node --test tests/booking.test.js",
+    "test:booking": "node tests/booking-flow.mjs",
+    "supabase:prepare": "node scripts/prepare-supabase.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

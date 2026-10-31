@@ -1,147 +1,89 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { formatMoney, isRental, localToday, quoteBooking, validateBooking } from '../lib/booking';
+import BookingReceipt from './BookingReceipt';
 import Icon from './Icon';
 
-// Checkout simple para el huésped: ve el servicio y paga desde su teléfono.
-// Nunca se muestra la comisión (es interna del recepcionista).
-export default function CheckoutModal({ rec, onClose, onConfirm, autoCharge = false }) {
-  const [form, setForm] = useState({ guestName: '', guestRoom: '', quantity: 1 });
-  const [status, setStatus] = useState('form'); // 'form' | 'saving' | 'done'
-
-  const quantity = Math.max(1, Number(form.quantity) || 1);
-  const total = (Number(rec.price) || 0) * quantity;
+export default function CheckoutModal({ rec, hotel, onClose, onConfirm }) {
+  const rental = isRental(rec);
+  const [form, setForm] = useState({ guestName: '', guestRoom: '', guestContact: '', quantity: 1,
+    serviceDate: '', serviceTime: '', endDate: '', endTime: '', pickupLocation: '' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [sale, setSale] = useState(null);
+  const submitting = useRef(false);
+  const panel = useRef(null);
+  const requestId = useRef(crypto.randomUUID());
+  let quote;
+  try { quote = quoteBooking(rec, form); } catch { /* Dates may still be incomplete. */ }
 
   useEffect(() => {
+    const previous = document.activeElement;
+    const overflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') onClose();
+    panel.current?.focus();
+    const keydown = (event) => {
+      if (event.key === 'Escape' && !submitting.current) onClose();
+      if (event.key === 'Tab') {
+        const elements = panel.current.querySelectorAll('button:not(:disabled), input:not(:disabled), a[href]');
+        const first = elements[0]; const last = elements[elements.length - 1];
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === panel.current)) {
+          event.preventDefault(); last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault(); first?.focus();
+        }
+      }
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.body.style.overflow = '';
-      window.removeEventListener('keydown', onKeyDown);
-    };
+    window.addEventListener('keydown', keydown);
+    return () => { document.body.style.overflow = overflow; window.removeEventListener('keydown', keydown); previous?.focus(); };
   }, [onClose]);
 
-  function update(key, value) {
-    setForm((current) => ({ ...current, [key]: value }));
-  }
-
-  async function handlePay(event) {
+  function update(key, value) { setForm((current) => ({ ...current, [key]: value })); }
+  async function submit(event) {
     event.preventDefault();
-    setStatus('saving');
+    if (submitting.current) return;
+    submitting.current = true;
+    setSaving(true); setError('');
     try {
-      await onConfirm({
-        guestName: form.guestName,
-        guestRoom: form.guestRoom,
-        quantity,
-        amount: total,
-      });
-    } catch {
-      // El registro es best-effort; igual dejamos pagar al huésped.
-    }
-    if (rec.paymentUrl) {
-      window.open(rec.paymentUrl, '_blank', 'noopener,noreferrer');
-    }
-    setStatus('done');
+      validateBooking(form);
+      const amounts = quoteBooking(rec, form);
+      const created = await onConfirm({ ...form, ...amounts, requestId: requestId.current });
+      if (!created?.bookingCode) throw new Error('No se pudo generar el cupón. Volvé a intentarlo.');
+      setSale(created);
+    } catch (currentError) {
+      setError(currentError.code ? 'No se pudo registrar la solicitud. Contactá a recepción o intentá más tarde.' : currentError.message || 'No se pudo guardar la solicitud. Volvé a intentarlo.');
+    } finally { submitting.current = false; setSaving(false); }
   }
 
   return (
-    <div
-      className="modal-backdrop fixed inset-0 z-50 flex items-end justify-center bg-[#1a1210]/70 p-0 md:items-center md:p-4"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div className="modal-content flex w-full flex-col overflow-hidden rounded-t-[32px] border border-white/70 bg-white shadow-[0_-18px_70px_rgba(26,18,16,0.20)] md:max-w-md md:rounded-[32px]">
-        <div className="flex items-center justify-between gap-4 border-b border-[#ece0cc] p-5">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#9a877a]">
-              Reservar y pagar
-            </p>
-            <h2 className="mt-1 truncate font-display text-xl font-semibold text-[#2a1d18]">
-              {rec.title}
-            </h2>
-          </div>
-          <button
-            aria-label="Cerrar"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f3e7d2] text-[#6e1f2c]"
-            onClick={onClose}
-            type="button"
-          >
-            <Icon name="x" size={16} />
-          </button>
-        </div>
-
-        {status === 'done' ? (
-          <div className="p-6 text-center">
-            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#e6f4ea] text-[#356b48]">
-              <Icon name="check" size={26} />
-            </span>
-            <h3 className="mt-4 font-display text-2xl font-semibold text-[#2a1d18]">
-              {autoCharge ? '¡Reserva confirmada!' : '¡Reserva registrada!'}
-            </h3>
-            <p className="mt-2 text-sm leading-6 text-[#7c6a5e]">
-              {autoCharge
-                ? rec.paymentUrl
-                  ? 'Te llevamos al pago. Al completarlo, tu reserva queda confirmada automáticamente.'
-                  : 'Tu reserva quedó confirmada. ¡Te esperamos!'
-                : 'Tu pedido llegó a la recepción del hotel. Te van a contactar para coordinar y cobrar.'}
-            </p>
-            <button
-              className="mt-6 w-full rounded-full bg-[#6e1f2c] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#561420]"
-              onClick={onClose}
-              type="button"
-            >
-              Listo
-            </button>
-          </div>
-        ) : (
-          <form className="p-5 sm:p-6" onSubmit={handlePay}>
-            <div className="flex items-center justify-between rounded-[20px] border border-[#ece0cc] bg-[#fbf5ea] px-4 py-3">
-              <span className="text-sm font-medium text-[#7c6a5e]">
-                {rec.provider || 'Servicio del hotel'}
-              </span>
-              <span className="font-display text-lg font-semibold text-[#2a1d18]">€{rec.price}</span>
+    <div className="booking-backdrop" onClick={(event) => { if (event.target === event.currentTarget && !saving) onClose(); }}>
+      <div ref={panel} tabIndex={-1} className="booking-modal" role="dialog" aria-modal="true" aria-labelledby="booking-title">
+        <header className="booking-header">
+          <div><p className="booking-muted">{rec.provider || 'Solicitud al proveedor'}</p><h2 id="booking-title">{rec.title}</h2></div>
+          <button className="booking-icon" type="button" aria-label="Cerrar" title="Cerrar" disabled={saving} onClick={onClose}><Icon name="x" /></button>
+        </header>
+        {sale ? <BookingReceipt sale={sale} hotelName={hotel?.name} /> : (
+          <form className="booking-form" onSubmit={submit}>
+            <p className="booking-notice">Fecha y horario sujetos a confirmación de la empresa.</p>
+            <div className="booking-grid">
+              <Field label="Tu nombre" value={form.guestName} onChange={(v) => update('guestName', v)} required />
+              <Field label="Habitación" value={form.guestRoom} onChange={(v) => update('guestRoom', v)} />
+              <Field label="Teléfono o email" value={form.guestContact} onChange={(v) => update('guestContact', v)} required />
+              <Field label={rental || rec.category === 'taxi' ? 'Vehículos' : 'Personas'} type="number" min="1" max="50" step="1" value={form.quantity} onChange={(v) => update('quantity', v)} required />
+              <Field label={rental ? 'Fecha de entrega' : 'Fecha solicitada'} type="date" min={localToday()} value={form.serviceDate} onChange={(v) => update('serviceDate', v)} required />
+              <Field label={rental ? 'Hora de entrega' : 'Hora solicitada'} type="time" value={form.serviceTime} onChange={(v) => update('serviceTime', v)} required />
+              {rental && <>
+                <Field label="Fecha de devolución" type="date" min={form.serviceDate || localToday()} value={form.endDate} onChange={(v) => update('endDate', v)} required />
+                <Field label="Hora de devolución" type="time" value={form.endTime} onChange={(v) => update('endTime', v)} required />
+              </>}
             </div>
-
-            <div className="mt-4 grid gap-4">
-              <Field
-                label="Tu nombre"
-                onChange={(value) => update('guestName', value)}
-                required
-                value={form.guestName}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <Field
-                  label="Habitación"
-                  onChange={(value) => update('guestRoom', value)}
-                  value={form.guestRoom}
-                />
-                <Field
-                  label="Cantidad"
-                  onChange={(value) => update('quantity', value)}
-                  type="number"
-                  value={form.quantity}
-                />
-              </div>
-            </div>
-
-            <div className="mt-5 flex items-center justify-between rounded-[20px] bg-[#1a1210] px-5 py-4 text-[#ecca80]">
-              <span className="text-sm font-semibold uppercase tracking-[0.14em]">Total</span>
-              <span className="font-display text-2xl font-bold">€{total}</span>
-            </div>
-
-            <button
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[linear-gradient(180deg,#7d2230_0%,#6e1f2c_50%,#581522_100%)] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(94,26,42,0.28)] transition hover:brightness-110 active:scale-[0.98] disabled:opacity-60"
-              disabled={status === 'saving'}
-              type="submit"
-            >
-              {status === 'saving' ? 'Procesando…' : `Pagar €${total}`}
-              {status !== 'saving' && <Icon name="arrowRight" size={16} />}
-            </button>
-            <p className="mt-3 text-center text-xs text-[#9a877a]">
-              Pago seguro · Reserva coordinada por la recepción del hotel
-            </p>
+            <Field label={rental ? 'Lugar de entrega solicitado' : 'Punto de recogida solicitado'} value={form.pickupLocation} onChange={(v) => update('pickupLocation', v)} placeholder={hotel?.name || rec.location} />
+            <fieldset className="booking-payment"><legend>Forma de pago</legend>
+              <label><input type="radio" name="paymentMethod" value="cash" checked readOnly /> Efectivo en recepción</label>
+              <label className="booking-muted"><input type="radio" name="paymentMethod" disabled /> Pago online (próximamente)</label>
+            </fieldset>
+            <div className="booking-total"><span>{rental && quote ? `${quote.days} día(s) · ${form.quantity} vehículo(s)` : 'Total pendiente'}</span><strong>{quote ? formatMoney(quote.amount) : 'Completá las fechas'}</strong></div>
+            {error && <p role="alert" className="booking-error">{error}</p>}
+            <button className="booking-primary" type="submit" disabled={saving}>{saving ? 'Guardando solicitud...' : 'Solicitar reserva y generar cupón'}<Icon name="ticket" /></button>
           </form>
         )}
       </div>
@@ -149,20 +91,6 @@ export default function CheckoutModal({ rec, onClose, onConfirm, autoCharge = fa
   );
 }
 
-function Field({ label, onChange, required = false, type = 'text', value }) {
-  return (
-    <label className="block">
-      <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-[#9a877a]">
-        {label}
-      </span>
-      <input
-        className="h-12 w-full rounded-full border border-[#e6d7bf] bg-white px-4 text-sm font-medium text-[#2a1d18] outline-none transition focus:border-[#c49a3f] focus:ring-4 focus:ring-[#e7cf9b]/70"
-        min={type === 'number' ? 1 : undefined}
-        onChange={(event) => onChange(event.target.value)}
-        required={required}
-        type={type}
-        value={value}
-      />
-    </label>
-  );
+function Field({ label, onChange, ...props }) {
+  return <label className="booking-field"><span>{label}</span><input {...props} onChange={(event) => onChange(event.target.value)} /></label>;
 }

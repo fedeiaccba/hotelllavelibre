@@ -17,7 +17,7 @@ const supabaseKey = (
   ''
 ).trim();
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey);
+export const isSupabaseConfigured = env.VITE_DEMO_MODE !== 'true' && Boolean(supabaseUrl && supabaseKey);
 
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })

@@ -26,6 +26,7 @@ import {
 } from '../../services/adminDataService';
 import BrandMark from '../BrandMark';
 import Icon from '../Icon';
+import BookingInbox from './BookingInbox';
 
 const EMPTY_HOTEL = {
   name: '',
@@ -57,6 +58,9 @@ const EMPTY_RECOMMENDATION = {
   featured: false,
   bookable: true,
   price: '',
+  providerCost: '',
+  receptionistCommission: '',
+  systemCommission: '',
   commission: '',
   provider: '',
   paymentUrl: '',
@@ -90,16 +94,39 @@ const EMPTY_SALE = {
   note: '',
 };
 
-const SALE_STATUSES = ['Cobrado', 'Pendiente', 'Anulado'];
+const SALE_STATUSES = ['Reservado', 'Pago pendiente', 'Cobrado', 'Liquidado', 'Anulado'];
+
+function normalizeSaleStatus(status) {
+  if (status === 'Pendiente') return 'Reservado';
+  return status || 'Reservado';
+}
 
 const currencyFormatter = new Intl.NumberFormat('es-ES', {
   style: 'currency',
   currency: 'EUR',
-  maximumFractionDigits: 0,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
 });
 
 function formatEuro(value) {
   return currencyFormatter.format(Number(value) || 0);
+}
+
+function getReceptionistCommission(item) {
+  return Number(item?.receptionistCommission ?? item?.commission) || 0;
+}
+
+function getSystemCommission(item) {
+  return Number(item?.systemCommission) || 0;
+}
+
+function getTotalCommission(item) {
+  return getReceptionistCommission(item) + getSystemCommission(item);
+}
+
+function getProviderCost(item) {
+  const price = Number(item?.price) || 0;
+  return Number(item?.providerCost) || Math.max(0, price - getTotalCommission(item));
 }
 
 const ROLE_LABELS = {
@@ -109,9 +136,9 @@ const ROLE_LABELS = {
 
 const SCHEMA_EXPORT = `create table public.admin_users (...);
 create table public.hotels (...);
-create table public.recommendations (...); -- + bookable, price, commission, provider
+create table public.recommendations (...); -- + price, provider_cost, receptionist_commission, system_commission
 create table public.events (...);
-create table public.sales (...); -- cobros y comisiones
+create table public.sales (...); -- cobros, proveedor y comisiones
 
 El archivo completo esta en supabase/schema.sql.`;
 
@@ -187,18 +214,46 @@ export default function AdminDashboard({ user }) {
     return scopedSales.reduce(
       (acc, sale) => {
         const amount = Number(sale.amount) || 0;
-        const commission = Number(sale.commission) || 0;
-        if (sale.status === 'Anulado') return acc;
-        if (sale.status === 'Pendiente') {
+        const receptionistCommission = Number(sale.receptionistCommission ?? sale.commission) || 0;
+        const systemCommission = Number(sale.systemCommission) || 0;
+        const commission = receptionistCommission + systemCommission;
+        const providerAmount = Number(sale.providerAmount) || Math.max(0, amount - commission);
+        const status = normalizeSaleStatus(sale.status);
+
+        if (status === 'Anulado') return acc;
+
+        acc.count += 1;
+        acc.generatedCommission += commission;
+
+        if (status === 'Reservado' || status === 'Pago pendiente') {
+          acc.reserved += amount;
           acc.pendingCommission += commission;
           return acc;
         }
+
         acc.billed += amount;
+        acc.receptionistCommission += receptionistCommission;
+        acc.systemCommission += systemCommission;
+        if (status === 'Cobrado') {
+          acc.providerPayable += providerAmount;
+          acc.pendingCommission += commission;
+          return acc;
+        }
+
         acc.commission += commission;
-        acc.count += 1;
         return acc;
       },
-      { billed: 0, commission: 0, pendingCommission: 0, count: 0 },
+      {
+        billed: 0,
+        commission: 0,
+        count: 0,
+        generatedCommission: 0,
+        pendingCommission: 0,
+        providerPayable: 0,
+        receptionistCommission: 0,
+        reserved: 0,
+        systemCommission: 0,
+      },
     );
   }, [scopedSales]);
 
@@ -228,9 +283,22 @@ export default function AdminDashboard({ user }) {
   async function saveRecommendation(payload) {
     try {
       setError('');
+      if (payload.bookable) {
+        const price = Math.round(Number(payload.price) * 100);
+        const parts = [payload.providerCost, payload.receptionistCommission, payload.systemCommission].map((v) => Math.round(Number(v || 0) * 100));
+        if (!Number.isFinite(price) || price <= 0 || parts.some((v) => !Number.isFinite(v) || v < 0) || parts.reduce((a, b) => a + b, 0) !== price) {
+          throw new Error('Empresa + recepción + sistema deben sumar el precio al huésped.');
+        }
+      }
       const normalized = {
         ...payload,
         hotelId: payload.hotelId || activeHotel?.id,
+        providerCost: Number(payload.providerCost) || 0,
+        receptionistCommission: Number(payload.receptionistCommission ?? payload.commission) || 0,
+        systemCommission: Number(payload.systemCommission) || 0,
+        commission:
+          (Number(payload.receptionistCommission ?? payload.commission) || 0) +
+          (Number(payload.systemCommission) || 0),
         tips: typeof payload.tips === 'string'
           ? payload.tips.split('\n').map((tip) => tip.trim()).filter(Boolean)
           : payload.tips,
@@ -356,6 +424,10 @@ export default function AdminDashboard({ user }) {
         (item) => String(item.id) === String(payload.recommendationId),
       );
       const quantity = Math.max(1, Number(payload.quantity) || 1);
+      const amount = Number(payload.amount) || 0;
+      const receptionistCommission = Number(payload.receptionistCommission ?? payload.commission) || 0;
+      const systemCommission = Number(payload.systemCommission) || 0;
+      const commission = receptionistCommission + systemCommission;
       const normalized = {
         hotelId: payload.hotelId || recommendation?.hotelId || activeHotel?.id,
         recommendationId: recommendation?.id || payload.recommendationId || null,
@@ -366,8 +438,11 @@ export default function AdminDashboard({ user }) {
         guestName: payload.guestName || '',
         guestRoom: payload.guestRoom || '',
         quantity,
-        amount: Number(payload.amount) || 0,
-        commission: Number(payload.commission) || 0,
+        amount,
+        providerAmount: Number(payload.providerAmount) || Math.max(0, amount - commission),
+        receptionistCommission,
+        systemCommission,
+        commission,
         status: payload.status || 'Cobrado',
         note: payload.note || '',
       };
@@ -447,11 +522,13 @@ export default function AdminDashboard({ user }) {
         )}
 
         <StatsGrid
-          commission={salesTotals.commission}
+          commission={salesTotals.generatedCommission}
           recommendations={scopedRecommendations.length}
           sales={salesTotals.count}
           scans={scopedHotels.reduce((total, hotel) => total + Number(hotel.qrScans || 0), 0)}
         />
+
+        <BookingInbox sales={scopedSales} user={user} onRefresh={loadData} loading={loading} />
 
         {isSuperAdmin ? (
           <div className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
@@ -511,7 +588,7 @@ export default function AdminDashboard({ user }) {
             onDelete={removeSale}
             onEdit={(sale) => setModal({ mode: 'edit-sale', item: sale })}
             onNew={() => setModal({ mode: 'new-sale' })}
-            sales={scopedSales}
+            sales={scopedSales.filter((sale) => !sale.bookingCode)}
             totals={salesTotals}
           />
         </div>
@@ -627,7 +704,7 @@ function HeroPanel({ isSuperAdmin, onNewHotel, onNewRecommendation, onNewSale, o
         </div>
         <div className="flex flex-wrap gap-2">
           {isSuperAdmin && <ActionButton icon="plus" label="Nuevo hotel" onClick={onNewHotel} />}
-          <ActionButton icon="coins" label="Registrar cobro" onClick={onNewSale} />
+          <ActionButton icon="coins" label="Cobro manual" onClick={onNewSale} />
           <ActionButton icon="list" label="Nuevo servicio" onClick={onNewRecommendation} variant="soft" />
           <ActionButton icon="eye" label="Ver web pública" onClick={onViewPublic} variant="soft" />
         </div>
@@ -639,8 +716,8 @@ function HeroPanel({ isSuperAdmin, onNewHotel, onNewRecommendation, onNewSale, o
 function StatsGrid({ commission, recommendations, sales, scans }) {
   const stats = [
     { icon: 'list', label: 'Servicios', value: recommendations },
-    { icon: 'ticket', label: 'Cobros', value: sales },
-    { icon: 'coins', label: 'Comisiones', value: formatEuro(commission), highlight: true },
+    { icon: 'ticket', label: 'Operaciones', value: sales },
+    { icon: 'coins', label: 'Com. previstas', value: formatEuro(commission), highlight: true },
     { icon: 'chart', label: 'Escaneos QR', value: scans.toLocaleString('es-ES') },
   ];
 
@@ -778,7 +855,7 @@ function HotelProfileSection({ hotel, onEdit }) {
         <InfoCard label="Plan" value={hotel?.plan} />
         <InfoCard label="URL pública" value={hotel?.publicUrl} />
         <InfoCard label="Estado" value={hotel?.status} />
-        <InfoCard label="Cobro del huésped" value={hotel?.autoCharge ? 'Automático' : 'Manual'} />
+        <InfoCard label="Cobro del huésped" value="Efectivo en recepción" />
       </div>
       <div className="mt-4 rounded-[24px] border border-[#ece0cc] bg-[#fbf5ea] p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#a8978b]">
@@ -808,12 +885,14 @@ function SalesSection({ hotels, isSuperAdmin, loading, onDelete, onEdit, onNew, 
       action={<ActionButton icon="coins" label="Registrar cobro" onClick={onNew} size="sm" />}
       eyebrow="Comisiones del conserje"
       icon="ticket"
-      title="Cobros y comisiones"
+      title="Resumen y cobros manuales"
     >
-      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <SaleTotal label="Total cobrado" value={formatEuro(totals.billed)} />
-        <SaleTotal label="Comisiones ganadas" value={formatEuro(totals.commission)} highlight />
-        <SaleTotal label="Comisión pendiente" value={formatEuro(totals.pendingCommission)} muted />
+        <SaleTotal label="A pagar empresa" value={formatEuro(totals.providerPayable)} muted />
+        <SaleTotal label="Recepción cobrada" value={formatEuro(totals.receptionistCommission)} highlight />
+        <SaleTotal label="Sistema cobrado" value={formatEuro(totals.systemCommission)} />
+        <SaleTotal label="Comisión prevista" value={formatEuro(totals.generatedCommission)} />
       </div>
 
       {loading ? (
@@ -826,6 +905,14 @@ function SalesSection({ hotels, isSuperAdmin, loading, onDelete, onEdit, onNew, 
         <div className="space-y-3">
           {sales.map((sale) => {
             const hotel = hotels.find((item) => String(item.id) === String(sale.hotelId));
+            const status = normalizeSaleStatus(sale.status);
+            const receptionistCommission = Number(sale.receptionistCommission ?? sale.commission) || 0;
+            const systemCommission = Number(sale.systemCommission) || 0;
+            const providerAmount = Math.max(
+              0,
+              Number(sale.providerAmount) ||
+                (Number(sale.amount) || 0) - receptionistCommission - systemCommission,
+            );
             const meta = [
               sale.guestName,
               sale.guestRoom && `Hab. ${sale.guestRoom}`,
@@ -841,7 +928,7 @@ function SalesSection({ hotels, isSuperAdmin, loading, onDelete, onEdit, onNew, 
                       <h3 className="truncate text-sm font-semibold text-[#2a1d18]">
                         {sale.recommendationTitle}
                       </h3>
-                      <StatusPill status={sale.status} />
+                      <StatusPill status={status} />
                     </div>
                     <p className="mt-1 text-xs leading-5 text-[#9a877a]">{meta}</p>
                     <p className="mt-1 text-xs font-medium text-[#a8978b]">
@@ -853,8 +940,16 @@ function SalesSection({ hotels, isSuperAdmin, loading, onDelete, onEdit, onNew, 
                     <div className="text-right">
                       <p className="text-sm font-semibold text-[#2a1d18]">{formatEuro(sale.amount)}</p>
                       <p className="text-xs font-semibold text-[#6e1f2c]">
-                        +{formatEuro(sale.commission)} com.
+                        {formatEuro(receptionistCommission)} recep.
                       </p>
+                      <p className="text-xs font-semibold text-[#8c6b1f]">
+                        {formatEuro(systemCommission)} sistema
+                      </p>
+                      {(status === 'Cobrado' || status === 'Liquidado') && (
+                        <p className="text-xs font-medium text-[#8a786b]">
+                          {formatEuro(providerAmount)} empresa
+                        </p>
+                      )}
                     </div>
                     <div className="flex flex-col gap-2">
                       <IconButton icon="edit" label="Editar" onClick={() => onEdit(sale)} />
@@ -911,6 +1006,7 @@ function SaleForm({ bookableRecommendations, currencyFormat, initialValue, onCan
     ...initialValue,
     recommendationId: initialValue.recommendationId || firstId,
     quantity: initialValue.quantity || 1,
+    status: normalizeSaleStatus(initialValue.status || EMPTY_SALE.status),
   });
 
   function update(key, value) {
@@ -941,10 +1037,19 @@ function SaleForm({ bookableRecommendations, currencyFormat, initialValue, onCan
     (item) => String(item.id) === String(form.recommendationId),
   );
   const quantity = Math.max(1, Number(form.quantity) || 1);
-  const amount = selected ? (Number(selected.price) || 0) * quantity : Number(initialValue.amount) || 0;
-  const commission = selected
-    ? (Number(selected.commission) || 0) * quantity
-    : Number(initialValue.commission) || 0;
+  const useCatalog = selected && !(initialValue.id &&
+    String(form.recommendationId) === String(initialValue.recommendationId) && quantity === Number(initialValue.quantity));
+  const amount = useCatalog ? (Number(selected.price) || 0) * quantity : Number(initialValue.amount) || 0;
+  const receptionistCommission = useCatalog
+    ? getReceptionistCommission(selected) * quantity
+    : Number(initialValue.receptionistCommission ?? initialValue.commission) || 0;
+  const systemCommission = useCatalog
+    ? getSystemCommission(selected) * quantity
+    : Number(initialValue.systemCommission) || 0;
+  const commission = receptionistCommission + systemCommission;
+  const providerAmount = useCatalog
+    ? getProviderCost(selected) * quantity
+    : Number(initialValue.providerAmount) || Math.max(0, amount - commission);
 
   return (
     <form
@@ -955,6 +1060,9 @@ function SaleForm({ bookableRecommendations, currencyFormat, initialValue, onCan
           ...form,
           quantity,
           amount,
+          providerAmount,
+          receptionistCommission,
+          systemCommission,
           commission,
           recommendationTitle: selected?.title || initialValue.recommendationTitle,
           hotelId: selected?.hotelId || initialValue.hotelId,
@@ -989,15 +1097,27 @@ function SaleForm({ bookableRecommendations, currencyFormat, initialValue, onCan
         />
       </div>
 
-      <div className="grid gap-3 rounded-[24px] border border-[#c49a3f]/35 bg-[linear-gradient(135deg,#fbf5ea_0%,#f4e9d4_100%)] p-4 sm:grid-cols-2">
+      <div className="grid gap-3 rounded-[24px] border border-[#c49a3f]/35 bg-[linear-gradient(135deg,#fbf5ea_0%,#f4e9d4_100%)] p-4 sm:grid-cols-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#a8978b]">Total a cobrar</p>
           <p className="mt-1 font-display text-2xl font-semibold text-[#2a1d18]">{currencyFormat(amount)}</p>
         </div>
         <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#a8978b]">Para empresa</p>
+          <p className="mt-1 font-display text-2xl font-semibold text-[#2a1d18]">
+            {currencyFormat(providerAmount)}
+          </p>
+        </div>
+        <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#a8978b]">Tu comisión</p>
           <p className="mt-1 font-display text-2xl font-semibold text-[#6e1f2c]">
-            {currencyFormat(commission)}
+            {currencyFormat(receptionistCommission)}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#a8978b]">Sistema</p>
+          <p className="mt-1 font-display text-2xl font-semibold text-[#8c6b1f]">
+            {currencyFormat(systemCommission)}
           </p>
         </div>
       </div>
@@ -1073,14 +1193,14 @@ function RecommendationsSection({ hotels, loading, onDelete, onEdit, onNew, reco
                     {item.bookable && (
                       <span className="inline-flex items-center gap-1 rounded-full border border-[#c49a3f]/45 bg-[#1a1210] px-2.5 py-0.5 text-[11px] font-semibold text-[#ecca80]">
                         <Icon name="coins" size={11} />
-                        {formatEuro(item.commission)}
+                        {formatEuro(getTotalCommission(item))}
                       </span>
                     )}
                   </div>
                   <p className="mt-1 text-xs leading-5 text-[#9a877a]">{item.location}</p>
                   <p className="mt-1 text-xs font-medium text-[#a8978b]">
                     {hotel?.name || 'Hotel'} · {CATEGORIES.find((c) => c.id === item.category)?.label || item.category}
-                    {item.bookable ? ` · €${item.price}` : ''}
+                    {item.bookable ? ` · €${item.price} · ${formatEuro(getProviderCost(item))} empresa` : ''}
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-col gap-2">
@@ -1184,8 +1304,8 @@ function HotelForm({ initialValue, onCancel, onSubmit }) {
         label="Modo de cobro del huésped"
         onChange={(value) => update('autoCharge', value === 'true')}
         options={[
-          { label: 'Automático — la comisión se acredita al pagar', value: 'true' },
-          { label: 'Manual — la recepción confirma cada cobro', value: 'false' },
+          { label: 'Online previsto (requiere integración de pago)', value: 'true' },
+          { label: 'Efectivo en recepción', value: 'false' },
         ]}
         value={form.autoCharge ? 'true' : 'false'}
       />
@@ -1201,6 +1321,9 @@ function RecommendationForm({ activeHotelId, hotels, initialValue, isSuperAdmin,
     ...EMPTY_RECOMMENDATION,
     ...initialValue,
     hotelId: initialValue.hotelId || activeHotelId || hotels[0]?.id || '',
+    providerCost: initialValue.providerCost ?? (initialValue.price ? getProviderCost(initialValue) : ''),
+    receptionistCommission: initialValue.receptionistCommission ?? initialValue.commission ?? '',
+    systemCommission: initialValue.systemCommission || '',
     tips: Array.isArray(initialValue.tips) ? initialValue.tips.join('\n') : initialValue.tips || '',
   });
 
@@ -1288,7 +1411,7 @@ function RecommendationForm({ activeHotelId, hotels, initialValue, isSuperAdmin,
             value={form.provider}
           />
         </div>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <FormField
             label="Precio al huésped (€)"
             onChange={(value) => update('price', value)}
@@ -1296,10 +1419,22 @@ function RecommendationForm({ activeHotelId, hotels, initialValue, isSuperAdmin,
             value={form.price}
           />
           <FormField
-            label="Comisión por reserva (€)"
-            onChange={(value) => update('commission', value)}
+            label="Costo empresa (€)"
+            onChange={(value) => update('providerCost', value)}
             type="number"
-            value={form.commission}
+            value={form.providerCost}
+          />
+          <FormField
+            label="Comisión recepción (€)"
+            onChange={(value) => update('receptionistCommission', value)}
+            type="number"
+            value={form.receptionistCommission}
+          />
+          <FormField
+            label="Comisión sistema (€)"
+            onChange={(value) => update('systemCommission', value)}
+            type="number"
+            value={form.systemCommission}
           />
         </div>
         <div className="mt-4">
@@ -1545,8 +1680,14 @@ function IconButton({ disabled = false, icon, label, onClick }) {
 }
 
 function StatusPill({ status }) {
-  const isActive = status === 'Activo' || status === 'Publicado' || status === 'Cobrado';
-  const isDraft = status === 'Borrador' || status === 'Pendiente' || status === 'Programado';
+  const isActive =
+    status === 'Activo' || status === 'Publicado' || status === 'Cobrado' || status === 'Liquidado';
+  const isDraft =
+    status === 'Borrador' ||
+    status === 'Pendiente' ||
+    status === 'Pago pendiente' ||
+    status === 'Programado' ||
+    status === 'Reservado';
   const isVoid = status === 'Anulado';
   const colors = isVoid
     ? 'bg-[#f7e7e7] text-[#8b4a4c]'
@@ -1586,6 +1727,7 @@ function FormField({ label, onChange, required = false, type = 'text', value }) 
         className="h-12 w-full rounded-full border border-[#e6d7bf] bg-white px-4 text-sm font-medium text-[#2a1d18] outline-none transition focus:border-[#c49a3f] focus:ring-4 focus:ring-[#e7cf9b]/70"
         onChange={(event) => onChange(event.target.value)}
         required={required}
+        step={type === 'number' ? 'any' : undefined}
         type={type}
         value={value || ''}
       />

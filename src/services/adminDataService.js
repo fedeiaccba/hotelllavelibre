@@ -1,5 +1,6 @@
 import { ADMIN_EVENTS, ADMIN_USERS, HOTELS, PLATFORM_SETTINGS, SALES } from '../data/adminMock';
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient';
+import { canCollectCash, quoteBooking, validateBooking } from '../lib/booking';
 
 // Comportamiento:
 // - Si Supabase está configurado (hay credenciales en .env.local), la base de datos
@@ -12,6 +13,12 @@ const LOCAL_EVENTS_KEY = 'gringacho_events';
 const LOCAL_HOTELS_KEY = 'gringacho_hotels';
 const LOCAL_RECOMMENDATIONS_KEY = 'gringacho_recommendations';
 const LOCAL_SALES_KEY = 'gringacho_sales';
+const BOOKING_FIELDS = {
+  bookingCode: 'booking_code', bookingStatus: 'booking_status', paymentMethod: 'payment_method',
+  guestContact: 'guest_contact', serviceDate: 'service_date', serviceTime: 'service_time',
+  endDate: 'end_date', endTime: 'end_time', pickupLocation: 'pickup_location',
+  expiresAt: 'expires_at', paidAt: 'paid_at', collectedBy: 'collected_by',
+};
 
 function toAdminUserRow(user) {
   return {
@@ -67,7 +74,36 @@ function fromHotelRow(row) {
   };
 }
 
+function toMoney(value) {
+  return Number(value) || 0;
+}
+
+function getRecommendationSplit(recommendation) {
+  const price = toMoney(recommendation.price);
+  const receptionistCommission = toMoney(
+    recommendation.receptionistCommission ?? recommendation.commission,
+  );
+  const systemCommission = toMoney(recommendation.systemCommission);
+  const commission = receptionistCommission + systemCommission;
+  const providerCost = recommendation.providerCost == null || recommendation.providerCost === ''
+    ? Math.max(0, price - commission) : toMoney(recommendation.providerCost);
+
+  return { commission, providerCost, receptionistCommission, systemCommission };
+}
+
+function getSaleSplit(sale) {
+  const amount = toMoney(sale.amount);
+  const receptionistCommission = toMoney(sale.receptionistCommission ?? sale.commission);
+  const systemCommission = toMoney(sale.systemCommission);
+  const commission = receptionistCommission + systemCommission;
+  const providerAmount = sale.providerAmount == null ? Math.max(0, amount - commission) : toMoney(sale.providerAmount);
+
+  return { commission, providerAmount, receptionistCommission, systemCommission };
+}
+
 function toRecommendationRow(recommendation) {
+  const split = getRecommendationSplit(recommendation);
+
   return {
     hotel_id: recommendation.hotelId,
     title: recommendation.title,
@@ -86,7 +122,10 @@ function toRecommendationRow(recommendation) {
     featured: Boolean(recommendation.featured),
     bookable: Boolean(recommendation.bookable),
     price: Number(recommendation.price) || 0,
-    commission: Number(recommendation.commission) || 0,
+    provider_cost: split.providerCost,
+    receptionist_commission: split.receptionistCommission,
+    system_commission: split.systemCommission,
+    commission: split.commission,
     provider: recommendation.provider || '',
     payment_url: recommendation.paymentUrl || '',
     tips: recommendation.tips || [],
@@ -94,6 +133,11 @@ function toRecommendationRow(recommendation) {
 }
 
 function fromRecommendationRow(row) {
+  const receptionistCommission = toMoney(row.receptionist_commission ?? row.commission);
+  const systemCommission = toMoney(row.system_commission);
+  const commission = toMoney(row.commission) || receptionistCommission + systemCommission;
+  const price = toMoney(row.price);
+
   return {
     id: row.id,
     hotelId: row.hotel_id,
@@ -112,8 +156,11 @@ function fromRecommendationRow(row) {
     status: row.status || 'Publicado',
     featured: Boolean(row.featured),
     bookable: Boolean(row.bookable),
-    price: Number(row.price) || 0,
-    commission: Number(row.commission) || 0,
+    price,
+    providerCost: row.provider_cost == null ? Math.max(0, price - commission) : toMoney(row.provider_cost),
+    receptionistCommission,
+    systemCommission,
+    commission,
     provider: row.provider || '',
     paymentUrl: row.payment_url || '',
     tips: row.tips || [],
@@ -142,7 +189,12 @@ function fromEventRow(row) {
 }
 
 function toSaleRow(sale) {
+  const split = getSaleSplit(sale);
+
   return {
+    ...Object.fromEntries(Object.entries(BOOKING_FIELDS)
+      .filter(([key]) => sale[key] !== undefined)
+      .map(([key, column]) => [column, sale[key] || null])),
     hotel_id: sale.hotelId,
     recommendation_id: sale.recommendationId || null,
     recommendation_title: sale.recommendationTitle,
@@ -152,14 +204,23 @@ function toSaleRow(sale) {
     guest_room: sale.guestRoom || '',
     quantity: Number(sale.quantity) || 1,
     amount: Number(sale.amount) || 0,
-    commission: Number(sale.commission) || 0,
+    provider_amount: split.providerAmount,
+    receptionist_commission: split.receptionistCommission,
+    system_commission: split.systemCommission,
+    commission: split.commission,
     status: sale.status || 'Cobrado',
     note: sale.note || '',
   };
 }
 
 function fromSaleRow(row) {
+  const receptionistCommission = toMoney(row.receptionist_commission ?? row.commission);
+  const systemCommission = toMoney(row.system_commission);
+  const commission = toMoney(row.commission) || receptionistCommission + systemCommission;
+  const amount = toMoney(row.amount);
+
   return {
+    ...Object.fromEntries(Object.entries(BOOKING_FIELDS).map(([key, column]) => [key, row[column] ?? null])),
     id: row.id,
     hotelId: row.hotel_id,
     recommendationId: row.recommendation_id,
@@ -169,8 +230,11 @@ function fromSaleRow(row) {
     guestName: row.guest_name || '',
     guestRoom: row.guest_room || '',
     quantity: Number(row.quantity) || 1,
-    amount: Number(row.amount) || 0,
-    commission: Number(row.commission) || 0,
+    amount,
+    providerAmount: row.provider_amount == null ? Math.max(0, amount - commission) : toMoney(row.provider_amount),
+    receptionistCommission,
+    systemCommission,
+    commission,
     status: row.status || 'Cobrado',
     note: row.note || '',
     createdAt: row.created_at || row.createdAt || null,
@@ -449,7 +513,8 @@ export async function createRecommendation(payload) {
     LOCAL_RECOMMENDATIONS_KEY,
     PLATFORM_SETTINGS.recommendations,
   );
-  const created = { ...payload, id: makeId('rec') };
+  const split = getRecommendationSplit(payload);
+  const created = { ...payload, ...split, id: makeId('rec') };
   writeLocal(LOCAL_RECOMMENDATIONS_KEY, [created, ...recommendations]);
   return created;
 }
@@ -472,7 +537,7 @@ export async function updateRecommendation(id, payload) {
     PLATFORM_SETTINGS.recommendations,
   );
   const updated = recommendations.map((item) =>
-    String(item.id) === String(id) ? { ...item, ...payload } : item,
+    String(item.id) === String(id) ? { ...item, ...payload, ...getRecommendationSplit(payload) } : item,
   );
   writeLocal(LOCAL_RECOMMENDATIONS_KEY, updated);
   return updated.find((item) => String(item.id) === String(id));
@@ -580,7 +645,7 @@ export async function createSale(payload) {
   if (isSupabaseConfigured) {
     const { data, error } = await supabase
       .from('sales')
-      .insert(toSaleRow(payload))
+      .insert({ ...toSaleRow(payload), ...(payload.id ? { id: payload.id } : {}) })
       .select()
       .single();
 
@@ -589,12 +654,13 @@ export async function createSale(payload) {
   }
 
   const sales = readLocal(LOCAL_SALES_KEY, SALES);
+  const split = getSaleSplit(payload);
   const created = {
     ...payload,
-    id: makeId('sale'),
+    ...split,
+    id: payload.id || makeId('sale'),
     quantity: Number(payload.quantity) || 1,
     amount: Number(payload.amount) || 0,
-    commission: Number(payload.commission) || 0,
     status: payload.status || 'Cobrado',
     createdAt: payload.createdAt || new Date().toISOString(),
   };
@@ -621,9 +687,9 @@ export async function updateSale(id, payload) {
       ? {
           ...sale,
           ...payload,
+          ...getSaleSplit(payload),
           quantity: Number(payload.quantity) || 1,
           amount: Number(payload.amount) || 0,
-          commission: Number(payload.commission) || 0,
         }
       : sale,
   );
@@ -643,4 +709,80 @@ export async function deleteSale(id) {
     LOCAL_SALES_KEY,
     sales.filter((sale) => String(sale.id) !== String(id)),
   );
+}
+
+export async function createGuestBooking(recommendationId, form, hotelId) {
+  const start = validateBooking(form);
+  const recommendations = await listRecommendations();
+  const item = recommendations.find((rec) => String(rec.id) === String(recommendationId));
+  if (!item?.bookable || item.status === 'Borrador' || String(item.hotelId) !== String(hotelId)) {
+    throw new Error('Este servicio ya no está disponible en el hotel.');
+  }
+  const quote = quoteBooking(item, form);
+  const expiresAt = new Date(Math.min(Date.now() + 86400000, start.getTime())).toISOString();
+  const payload = {
+    ...quote, id: form.requestId, hotelId, recommendationId: item.id, recommendationTitle: item.title,
+    guestName: form.guestName.trim(), guestRoom: form.guestRoom.trim(), guestContact: form.guestContact.trim(),
+    serviceDate: form.serviceDate, serviceTime: form.serviceTime,
+    endDate: form.endDate || null, endTime: form.endTime || null,
+    pickupLocation: form.pickupLocation.trim(),
+    bookingCode: `LL-${form.requestId.replaceAll('-', '').slice(0, 12).toUpperCase()}`,
+    bookingStatus: 'Solicitada', paymentMethod: 'cash', status: 'Reservado', expiresAt,
+    receptionistName: 'Reserva web', note: 'Disponibilidad pendiente de confirmación del proveedor.',
+  };
+  if (isSupabaseConfigured) {
+    const { data, error } = await supabase.from('sales').select('*').eq('id', payload.id).maybeSingle();
+    if (error) throw error;
+    if (data) return fromSaleRow(data);
+  } else {
+    const existing = readLocal(LOCAL_SALES_KEY, SALES).find((sale) => sale.id === payload.id);
+    if (existing) return existing;
+  }
+  try { return await createSale(payload); }
+  catch (error) {
+    if (isSupabaseConfigured && error.code === '23505') {
+      const result = await supabase.from('sales').select('*').eq('id', payload.id).single();
+      if (!result.error) return fromSaleRow(result.data);
+    }
+    throw error;
+  }
+}
+
+export async function processBooking(sale, action, user) {
+  if (user.role !== 'super_admin' && String(user.hotelId) !== String(sale.hotelId)) {
+    throw new Error('Esta reserva pertenece a otro hotel.');
+  }
+  const now = new Date().toISOString();
+  const expired = !sale.expiresAt || new Date(sale.expiresAt) <= new Date();
+  let patch;
+  if (action === 'confirm' && sale.bookingStatus === 'Solicitada' && sale.status === 'Reservado' && !expired) {
+    patch = { bookingStatus: 'Confirmada' };
+  } else if (action === 'collect' && canCollectCash(sale)) {
+    patch = { status: 'Cobrado', paidAt: now, collectedBy: user.name };
+  } else if (action === 'cancel' && sale.status === 'Reservado' && sale.bookingStatus !== 'Cancelada') {
+    patch = { bookingStatus: 'Cancelada', status: 'Anulado' };
+  } else {
+    throw new Error('El cupón venció o su estado ya cambió. Actualizá las reservas.');
+  }
+  if (isSupabaseConfigured) {
+    const changes = Object.fromEntries(Object.entries(patch).map(([key, value]) => [BOOKING_FIELDS[key] || key, value]));
+    let query = supabase.from('sales').update(changes).eq('id', sale.id)
+      .eq('hotel_id', sale.hotelId).eq('status', sale.status).eq('booking_status', sale.bookingStatus);
+    if (action !== 'cancel') query = query.gt('expires_at', now).eq('payment_method', 'cash');
+    const { data, error } = await query.select().maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('La reserva cambió en otro dispositivo. Actualizá las reservas.');
+    return fromSaleRow(data);
+  }
+  const mutate = () => {
+    const sales = readLocal(LOCAL_SALES_KEY, SALES);
+    const current = sales.find((item) => item.id === sale.id);
+    if (!current || current.status !== sale.status || current.bookingStatus !== sale.bookingStatus) {
+      throw new Error('La reserva ya fue procesada.');
+    }
+    const updated = { ...current, ...patch };
+    writeLocal(LOCAL_SALES_KEY, sales.map((item) => item.id === sale.id ? updated : item));
+    return updated;
+  };
+  return navigator.locks ? navigator.locks.request(`booking-${sale.id}`, mutate) : mutate();
 }

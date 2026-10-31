@@ -1,78 +1,144 @@
-# Supabase setup
+# Armar Supabase para LlaveLibre
 
-La app usa Supabase como base de datos. Si hay credenciales, **la base es la única
-fuente de verdad**: todas las operaciones del panel (hoteles, servicios, eventos,
-usuarios y cobros) golpean Supabase y, si algo falla, el error se ve en pantalla.
-Si NO hay credenciales, la app cae a `localStorage` con datos de ejemplo (modo demo).
+Esta guia conecta la version actual para pruebas de catalogo, reservas y cobros
+de ejemplo. El SQL incluye usuarios demo y acceso publico a las tablas para
+mantener compatibilidad con el login actual. No usar datos personales reales
+ni dinero real: antes de publicar se debe migrar a Supabase Auth y restringir
+las politicas por hotel y rol. Cambiar el password demo no cierra esos permisos.
 
-## 1. Crear las tablas
+## 1. Crear o elegir el proyecto
 
-En Supabase → **SQL Editor** → pegar y ejecutar todo el contenido de
-[`supabase/schema.sql`](./schema.sql). Es idempotente y auto-reparable (agrega
-columnas faltantes; se puede correr varias veces).
+1. Entrar en https://supabase.com/dashboard e iniciar sesion.
+2. Si no hay un proyecto para esta app, elegir New project, una organizacion,
+   un nombre (por ejemplo llave-libre-pruebas), una clave de base de datos y
+   una region cercana a los usuarios. Esperar a que termine de crearse.
+3. Si ya hay uno, abrirlo y revisar Table Editor. No borrar tablas ni ejecutar
+   reset.sql para intentar resolver un error.
 
-> **¿Te dio un error tipo `column "location" of relation "hotels" does not exist`?**
-> Tu proyecto tiene tablas viejas de otra versión que chocan. Estás en setup, así que
-> lo más simple es: ejecutá primero [`supabase/reset.sql`](./reset.sql) (borra esas
-> tablas y sus datos) y después [`supabase/schema.sql`](./schema.sql) para crear todo
-> limpio.
+La clave de base de datos se conserva de forma privada. La app del navegador
+no usa esa clave ni la cadena de conexion Postgres.
 
-Crea/actualiza:
+## 2. Instalar tablas y ejemplos
 
-- `admin_users` — usuarios del panel (super admin / hotel admin)
-- `hotels` — incluye `auto_charge` (cobro automático/manual)
-- `recommendations` — servicios; incluye `bookable`, `price`, `commission`, `provider`, `payment_url`
-- `events`
-- `sales` — cobros y comisiones
-- índices, triggers de `updated_at` y políticas RLS demo (abiertas, para desarrollo)
+En el proyecto elegido: SQL Editor > New query. Pegar y ejecutar completo:
 
-## 2. Configurar variables
+**supabase/INSTALAR_PRUEBAS.sql**
 
-`.env.local` en la raíz del proyecto:
+El archivo incluye el schema actual, los campos de cupones, los permisos de
+prueba, un hotel, dos usuarios y tres servicios de ejemplo. Usa una transaccion
+y no borra tablas, reservas ni servicios. No modifica el password de usuarios
+que ya existen ni las tarifas de servicios con el mismo titulo en ese hotel.
+Si la base ya tiene datos importantes, respaldarla antes de actualizarla.
 
-```bash
-VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=tu-publishable-o-anon-key
+No hace falta ejecutar aparte la migracion 20261031_booking_workflow.sql:
+la instalacion completa ya incluye sus columnas. Esa migracion se conserva
+para actualizar instalaciones anteriores que ya tienen tablas.
+
+Para regenerar el archivo completo despues de cambiar el schema o los ejemplos:
+
+```powershell
+npm run supabase:prepare
 ```
 
-> Reiniciá Vite después de crear o cambiar `.env.local`.
-> Para verificar el modo, abrí la consola del navegador: dice
-> "Conectado a Supabase" o "usando datos locales".
+Si falla el SQL, revisar el mensaje y la linea. La transaccion completa se
+revierte al fallar. No resolverlo borrando datos.
 
-## 3. Primer acceso (bootstrap)
+## 3. Verificar el SQL
 
-El schema crea un usuario inicial para poder entrar:
+Abrir otra consulta y ejecutar **supabase/verificar.sql**. Para una base nueva:
 
-- `admin@demo.com` / `123456` (super admin)
+| Tabla | Filas esperadas |
+| --- | ---: |
+| hotels | 1 |
+| admin_users | 2 |
+| recommendations | 3 |
+| events | 1 |
+| sales | 0 |
 
-**Cambialo apenas entres** (creá tu usuario real desde el panel y borrá/cambiá el demo,
-o actualizalo por SQL):
+La segunda consulta debe listar 12 columnas de reserva. La tercera debe
+devolver cero servicios con reparto incorrecto. Si habia datos, los conteos
+pueden ser mayores. sales pasa a tener filas cuando un huesped solicita algo.
 
-```sql
-update public.admin_users
-set email = 'tu@email.com', password = 'una-clave-fuerte'
-where email = 'admin@demo.com';
+## 4. Conectar la app
+
+En Supabase abrir **Connect**, seleccionar React y obtener **Project URL** y
+**Publishable key**. Tambien se pueden consultar las claves en Settings > API Keys.
+Para este frontend no usar secret key, service_role ni la clave de la base.
+
+El proyecto ya tiene .env.local. Completarlo con los valores del proyecto elegido;
+la plantilla .env.example muestra los nombres exactos. No publicar el archivo.
+
+```dotenv
+VITE_SUPABASE_URL=https://TU-PROYECTO.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=TU-CLAVE-PUBLISHABLE
+VITE_DEMO_MODE=false
 ```
 
-## 4. Seguridad (importante para producción)
+La URL es la URL HTTPS del proyecto, sin /rest/v1 ni rutas del dashboard.
+Una clave anon de proyectos anteriores tambien se admite, pero preferir la
+publishable al configurar un proyecto nuevo.
 
-La demo guarda contraseñas en texto plano y las políticas RLS son abiertas, así que
-con la clave pública se pueden leer los `admin_users`. Para producción conviene:
+## 5. Iniciar sin modo demo
 
-- Migrar el login a **Supabase Auth** (o a una Edge Function), y no guardar contraseñas en la tabla.
-- Cerrar las políticas RLS por rol/claims.
+Desde la raiz del proyecto, en PowerShell:
 
-Puedo ayudarte a hacer esa migración cuando quieras.
+```powershell
+$env:VITE_DEMO_MODE = 'false'
+npm run dev -- --host 127.0.0.1 --port 5176
+```
 
-## 5. Cobro automático (opcional, verificado)
+La variable del proceso prevalece sobre .env.local: el primer comando evita
+heredar el modo demo de otra terminal. Reiniciar Vite al cambiar .env.local.
+Usar la URL exacta que informe Vite si el puerto esta ocupado.
 
-`supabase/functions/payment-webhook/index.ts` confirma cobros cuando el proveedor de
-pago avisa que el pago se acreditó. Es opcional: el modo "Automático" del panel ya
-marca el cobro al pagar (optimista) sin necesidad del webhook.
+La demo anterior en localhost:5175 sigue separada; no sirve para comprobar la
+conexion real. Sus reservas locales no se transfieren automaticamente a Supabase.
 
-## 6. Archivos principales
+## 6. Entrar y probar el circuito
 
-- Cliente Supabase: `src/lib/supabaseClient.js`
-- Servicio CRUD: `src/services/adminDataService.js`
-- Panel admin: `src/components/admin/AdminDashboard.jsx`
-- Login: `src/components/admin/AdminLogin.jsx`
+1. Abrir http://127.0.0.1:5176/admin/login.
+2. Para recepcion: hotel@demo.com / 123456.
+3. Para administracion general: admin@demo.com / 123456.
+4. Si habia una sesion local anterior, salir e ingresar de nuevo: los usuarios
+   reales de la base tienen identificadores distintos de los del modo demo.
+5. El panel debe mostrar Base de datos conectada y cargar el hotel/servicios.
+   Esa etiqueta indica configuracion presente; la carga exitosa de datos y
+   el guardado de una reserva comprueban efectivamente la conexion.
+6. Abrir http://127.0.0.1:5176/h/hotel-atlantico-albufeira.
+7. En la excursion demo, pedir una fecha futura y generar el cupon. Usar nombre
+   y contacto ficticios. Una persona: EUR 60 = empresa 40 + recepcion 10 + sistema 10.
+8. En el panel buscar ese codigo. Confirmar disponibilidad solo como prueba
+   (no hay conexion con la empresa); despues registrar Recibir efectivo.
+9. Actualizar la pagina y comprobar que sigue cobrada y no permite cobrar otra vez.
+10. En Table Editor > sales debe existir la reserva con booking_code, status
+    Cobrado y paid_at. Ningun dinero se mueve al realizar esta prueba.
+
+Si los usuarios ya existian, conservan sus claves anteriores: el instalador
+no cambia passwords. Las cuentas son de la tabla admin_users; esta version
+todavia no inicia sesion con Authentication > Users.
+
+## 7. Problemas habituales
+
+| Sintoma | Comprobar |
+| --- | --- |
+| Sigue diciendo modo local o demo | VITE_DEMO_MODE=false y reiniciar el proceso correcto |
+| Invalid API key o 401 | URL y clave pertenecen al mismo proyecto; usar publishable/anon |
+| relation/column does not exist o schema cache | Ejecutar el instalador completo en ese mismo proyecto |
+| permission denied o 403 | Revisar permisos/politicas del proyecto; el instalador incluye los de prueba |
+| El catalogo esta vacio | Confirmar tres filas de recommendations con hotel_id, Publicado y bookable |
+| Login incorrecto | Las cuentas existentes no cambian de password al repetir el SQL |
+| No deja recibir efectivo | Confirmar disponibilidad; el cupon no debe estar vencido ni cobrado |
+
+## Lo que esta instalacion no activa
+
+No requiere instalar Supabase CLI, desplegar Edge Functions, configurar Storage
+ni webhooks para probar el flujo de efectivo. Las imagenes son URLs de ejemplo.
+Online y sincronizacion de cupos con empresas siguen pendientes. No desplegar el
+borrador payment-webhook como si fuera una integracion de pago terminada.
+
+## Fuentes oficiales
+
+- https://supabase.com/docs/guides/getting-started/quickstarts/reactjs
+- https://supabase.com/docs/guides/getting-started/api-keys
+
+Guia revisada el 31/10/2026. Los ejemplos y SQL corresponden al codigo local.

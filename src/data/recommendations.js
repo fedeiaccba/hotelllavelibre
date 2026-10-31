@@ -3,11 +3,12 @@
 // La comisión es interna (no se muestra al huésped) y se usa para ordenar el catálogo.
 export const CATEGORIES = [
   { id: 'todos', label: 'Todos', icon: 'grid' },
+  { id: 'excursion', label: 'Excursiones', icon: 'compass' },
+  { id: 'alquiler-auto', label: 'Alquiler de autos', icon: 'key' },
+  { id: 'alquiler-moto', label: 'Alquiler de motos', icon: 'key' },
+  { id: 'taxi', label: 'Traslados', icon: 'car' },
   { id: 'restaurante', label: 'Restaurantes', icon: 'utensils' },
   { id: 'bar', label: 'Bares', icon: 'glass' },
-  { id: 'excursion', label: 'Excursiones', icon: 'compass' },
-  { id: 'taxi', label: 'Taxi y traslados', icon: 'car' },
-  { id: 'alquiler-auto', label: 'Alquiler de autos', icon: 'key' },
 ];
 
 export const CATEGORY_STYLES = {
@@ -16,6 +17,7 @@ export const CATEGORY_STYLES = {
   excursion: { bg: '#EAF4EC', color: '#356B48', soft: '#F4FAF5' },
   taxi: { bg: '#f1e6d2', color: '#6e1f2c', soft: '#fbf5ea' },
   'alquiler-auto': { bg: '#F4EDE1', color: '#8A6537', soft: '#FCF8F1' },
+  'alquiler-moto': { bg: '#e6f2f5', color: '#246273', soft: '#f1f9fb' },
 };
 
 export const DIFFICULTY_STYLES = {
@@ -24,10 +26,23 @@ export const DIFFICULTY_STYLES = {
   Exigente: { bg: '#F7E7E7', color: '#8B4A4C' },
 };
 
-// price = precio que paga el huésped (€). commission = comisión fija del recepcionista (€), interna.
+// price = precio que paga el huésped (€).
+// providerCost + receptionistCommission + systemCommission explican cómo se reparte ese total.
+// commission = receptionistCommission + systemCommission, interna.
 // paymentUrl = link de pago (Stripe Payment Link / Mercado Pago). Si está vacío, el cobro queda
 // pendiente para que la recepción lo confirme.
 export const RECOMMENDATIONS = [
+  {
+    id: 11, title: 'Alquiler de scooter 125 cc', subtitle: 'Alquiler de motos', category: 'alquiler-moto',
+    shortDescription: 'Scooter por día para recorrer el Algarve. Entrega a coordinar con la empresa.',
+    fullDescription: 'Solicitá un scooter indicando entrega y devolución. La empresa confirma unidad, documentación del conductor, depósito y seguro antes de cerrar el alquiler.',
+    image: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=1000&q=80',
+    location: 'Albufeira', duration: 'Por día', price: 40, providerCost: 30,
+    receptionistCommission: 5, systemCommission: 5, commission: 10,
+    provider: 'Algarve Mobility (demo)', bookable: true, featured: false,
+    tips: ['Licencia y depósito sujetos a condiciones del proveedor'],
+    mapUrl: 'https://maps.google.com/?q=Albufeira',
+  },
   {
     id: 1,
     title: 'Cena en O Marinheiro',
@@ -147,8 +162,11 @@ export const RECOMMENDATIONS = [
     location: 'Benagil, Lagoa',
     hours: 'Mañana y tarde',
     duration: '3 a 4 h',
-    price: 35,
-    commission: 7,
+    price: 60,
+    providerCost: 40,
+    receptionistCommission: 10,
+    systemCommission: 10,
+    commission: 20,
     provider: 'Benagil Boat Tours',
     bookable: true,
     featured: false,
@@ -229,7 +247,10 @@ export const RECOMMENDATIONS = [
     hours: 'Por día',
     duration: '24 h',
     price: 60,
-    commission: 14,
+    providerCost: 40,
+    receptionistCommission: 10,
+    systemCommission: 10,
+    commission: 20,
     provider: 'Algarve Rent a Car',
     bookable: true,
     featured: true,

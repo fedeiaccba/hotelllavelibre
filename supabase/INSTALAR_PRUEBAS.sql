@@ -1,0 +1,400 @@
+-- ARCHIVO GENERADO: npm run supabase:prepare
+
+-- SOLO PRUEBAS. Incluye usuarios demo y permisos publicos abiertos.
+
+-- Ejecutar completo en SQL Editor. No borra tablas ni reservas.
+
+begin;
+
+-- LlaveLibre — schema idempotente y AUTO-REPARABLE.
+-- Se puede correr varias veces. Si ya existían tablas viejas (de otra versión),
+-- este script les agrega las columnas que falten en vez de fallar.
+-- SOLO PRUEBAS: usuarios con password de ejemplo y politicas RLS abiertas.
+-- No cargar datos personales reales ni usar para operar dinero real.
+-- Pegar TODO en Supabase → SQL Editor → Run.
+
+create extension if not exists "pgcrypto";
+
+-- ===========================================================================
+-- TABLAS (create if not exists) + asegurar columnas faltantes (add if not exists)
+-- Las columnas se agregan como nullable / con default para no romper si la tabla
+-- ya tiene filas.
+-- ===========================================================================
+
+-- admin_users -------------------------------------------------------------
+create table if not exists public.admin_users (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  email text not null unique,
+  password text not null,
+  role text not null default 'hotel_admin',
+  hotel_id uuid,
+  status text not null default 'Activo',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.admin_users add column if not exists name text;
+alter table public.admin_users add column if not exists email text;
+alter table public.admin_users add column if not exists password text;
+alter table public.admin_users add column if not exists role text default 'hotel_admin';
+alter table public.admin_users add column if not exists hotel_id uuid;
+alter table public.admin_users add column if not exists status text default 'Activo';
+alter table public.admin_users add column if not exists created_at timestamptz default now();
+alter table public.admin_users add column if not exists updated_at timestamptz default now();
+
+-- hotels ------------------------------------------------------------------
+create table if not exists public.hotels (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  slug text not null unique,
+  location text not null,
+  plan text not null default 'Standard',
+  status text not null default 'Activo',
+  admin_name text,
+  public_url text,
+  qr_scans integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.hotels add column if not exists name text;
+alter table public.hotels add column if not exists slug text;
+alter table public.hotels add column if not exists location text;
+alter table public.hotels add column if not exists plan text default 'Standard';
+alter table public.hotels add column if not exists status text default 'Activo';
+alter table public.hotels add column if not exists admin_name text;
+alter table public.hotels add column if not exists public_url text;
+alter table public.hotels add column if not exists qr_scans integer default 0;
+alter table public.hotels add column if not exists auto_charge boolean default false;
+alter table public.hotels add column if not exists created_at timestamptz default now();
+alter table public.hotels add column if not exists updated_at timestamptz default now();
+
+-- Aseguramos slug único (necesario para upsert por slug). Si hubiera slugs
+-- duplicados en datos viejos, no aborta el script.
+do $$ begin
+  create unique index if not exists hotels_slug_uidx on public.hotels (slug);
+exception when others then null; end $$;
+
+-- FK admin_users.hotel_id -> hotels.id
+alter table public.admin_users drop constraint if exists admin_users_hotel_id_fkey;
+alter table public.admin_users
+  add constraint admin_users_hotel_id_fkey
+  foreign key (hotel_id) references public.hotels(id) on delete set null;
+
+-- recommendations (servicios) --------------------------------------------
+create table if not exists public.recommendations (
+  id uuid primary key default gen_random_uuid(),
+  hotel_id uuid references public.hotels(id) on delete cascade,
+  title text not null,
+  subtitle text,
+  category text not null,
+  short_description text,
+  full_description text,
+  image text,
+  distance text,
+  duration text,
+  difficulty text,
+  location text,
+  hours text,
+  map_url text,
+  status text not null default 'Publicado',
+  featured boolean not null default false,
+  bookable boolean not null default false,
+  price numeric not null default 0,
+  provider_cost numeric not null default 0,
+  receptionist_commission numeric not null default 0,
+  system_commission numeric not null default 0,
+  commission numeric not null default 0,
+  provider text,
+  payment_url text,
+  tips text[] not null default '{}',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.recommendations add column if not exists hotel_id uuid;
+alter table public.recommendations add column if not exists title text;
+alter table public.recommendations add column if not exists subtitle text;
+alter table public.recommendations add column if not exists category text;
+alter table public.recommendations add column if not exists short_description text;
+alter table public.recommendations add column if not exists full_description text;
+alter table public.recommendations add column if not exists image text;
+alter table public.recommendations add column if not exists distance text;
+alter table public.recommendations add column if not exists duration text;
+alter table public.recommendations add column if not exists difficulty text;
+alter table public.recommendations add column if not exists location text;
+alter table public.recommendations add column if not exists hours text;
+alter table public.recommendations add column if not exists map_url text;
+alter table public.recommendations add column if not exists status text default 'Publicado';
+alter table public.recommendations add column if not exists featured boolean default false;
+alter table public.recommendations add column if not exists bookable boolean default false;
+alter table public.recommendations add column if not exists price numeric default 0;
+alter table public.recommendations add column if not exists provider_cost numeric default 0;
+alter table public.recommendations add column if not exists receptionist_commission numeric default 0;
+alter table public.recommendations add column if not exists system_commission numeric default 0;
+alter table public.recommendations add column if not exists commission numeric default 0;
+alter table public.recommendations add column if not exists provider text;
+alter table public.recommendations add column if not exists payment_url text;
+alter table public.recommendations add column if not exists tips text[] default '{}';
+alter table public.recommendations add column if not exists created_at timestamptz default now();
+alter table public.recommendations add column if not exists updated_at timestamptz default now();
+
+-- events ------------------------------------------------------------------
+create table if not exists public.events (
+  id uuid primary key default gen_random_uuid(),
+  hotel_id uuid references public.hotels(id) on delete cascade,
+  title text not null,
+  date text not null,
+  category text,
+  status text not null default 'Publicado',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.events add column if not exists hotel_id uuid;
+alter table public.events add column if not exists title text;
+alter table public.events add column if not exists date text;
+alter table public.events add column if not exists category text;
+alter table public.events add column if not exists status text default 'Publicado';
+alter table public.events add column if not exists created_at timestamptz default now();
+alter table public.events add column if not exists updated_at timestamptz default now();
+
+-- sales (cobros y comisiones) --------------------------------------------
+create table if not exists public.sales (
+  id uuid primary key default gen_random_uuid(),
+  hotel_id uuid references public.hotels(id) on delete cascade,
+  recommendation_id uuid references public.recommendations(id) on delete set null,
+  recommendation_title text,
+  receptionist_id uuid references public.admin_users(id) on delete set null,
+  receptionist_name text,
+  guest_name text,
+  guest_room text,
+  quantity integer not null default 1,
+  amount numeric not null default 0,
+  provider_amount numeric not null default 0,
+  receptionist_commission numeric not null default 0,
+  system_commission numeric not null default 0,
+  commission numeric not null default 0,
+  status text not null default 'Cobrado',
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.sales add column if not exists hotel_id uuid;
+alter table public.sales add column if not exists recommendation_id uuid;
+alter table public.sales add column if not exists recommendation_title text;
+alter table public.sales add column if not exists receptionist_id uuid;
+alter table public.sales add column if not exists receptionist_name text;
+alter table public.sales add column if not exists guest_name text;
+alter table public.sales add column if not exists guest_room text;
+alter table public.sales add column if not exists quantity integer default 1;
+alter table public.sales add column if not exists amount numeric default 0;
+alter table public.sales add column if not exists provider_amount numeric default 0;
+alter table public.sales add column if not exists receptionist_commission numeric default 0;
+alter table public.sales add column if not exists system_commission numeric default 0;
+alter table public.sales add column if not exists commission numeric default 0;
+alter table public.sales add column if not exists status text default 'Cobrado';
+alter table public.sales add column if not exists note text;
+alter table public.sales add column if not exists created_at timestamptz default now();
+alter table public.sales add column if not exists updated_at timestamptz default now();
+alter table public.sales add column if not exists booking_code text;
+alter table public.sales add column if not exists booking_status text;
+alter table public.sales add column if not exists payment_method text;
+alter table public.sales add column if not exists guest_contact text;
+alter table public.sales add column if not exists service_date date;
+alter table public.sales add column if not exists service_time time;
+alter table public.sales add column if not exists end_date date;
+alter table public.sales add column if not exists end_time time;
+alter table public.sales add column if not exists pickup_location text;
+alter table public.sales add column if not exists expires_at timestamptz;
+alter table public.sales add column if not exists paid_at timestamptz;
+alter table public.sales add column if not exists collected_by text;
+create unique index if not exists sales_booking_code_uidx on public.sales (booking_code);
+
+-- Migracion suave para datos anteriores al desglose recepcion/sistema.
+update public.recommendations
+set
+  receptionist_commission = coalesce(nullif(receptionist_commission, 0), commission, 0),
+  system_commission = coalesce(system_commission, 0),
+  provider_cost = case
+    when coalesce(provider_cost, 0) > 0 then provider_cost
+    else greatest(coalesce(price, 0) - coalesce(commission, 0), 0)
+  end
+where coalesce(receptionist_commission, 0) = 0
+  and coalesce(system_commission, 0) = 0
+  and coalesce(commission, 0) > 0;
+
+update public.sales
+set
+  receptionist_commission = coalesce(nullif(receptionist_commission, 0), commission, 0),
+  system_commission = coalesce(system_commission, 0),
+  provider_amount = case
+    when coalesce(provider_amount, 0) > 0 then provider_amount
+    else greatest(coalesce(amount, 0) - coalesce(commission, 0), 0)
+  end
+where coalesce(receptionist_commission, 0) = 0
+  and coalesce(system_commission, 0) = 0
+  and coalesce(commission, 0) > 0;
+
+-- ===========================================================================
+-- ÍNDICES
+-- ===========================================================================
+create index if not exists recommendations_hotel_id_idx on public.recommendations (hotel_id);
+create index if not exists recommendations_category_idx on public.recommendations (category);
+create index if not exists recommendations_status_idx on public.recommendations (status);
+create index if not exists admin_users_email_idx on public.admin_users (email);
+create index if not exists admin_users_role_idx on public.admin_users (role);
+create index if not exists events_hotel_id_idx on public.events (hotel_id);
+create index if not exists events_status_idx on public.events (status);
+create index if not exists sales_hotel_id_idx on public.sales (hotel_id);
+create index if not exists sales_receptionist_id_idx on public.sales (receptionist_id);
+create index if not exists sales_status_idx on public.sales (status);
+create index if not exists sales_created_at_idx on public.sales (created_at);
+
+-- ===========================================================================
+-- TRIGGERS updated_at
+-- ===========================================================================
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists hotels_set_updated_at on public.hotels;
+create trigger hotels_set_updated_at
+before update on public.hotels
+for each row execute function public.set_updated_at();
+
+drop trigger if exists admin_users_set_updated_at on public.admin_users;
+create trigger admin_users_set_updated_at
+before update on public.admin_users
+for each row execute function public.set_updated_at();
+
+drop trigger if exists recommendations_set_updated_at on public.recommendations;
+create trigger recommendations_set_updated_at
+before update on public.recommendations
+for each row execute function public.set_updated_at();
+
+drop trigger if exists events_set_updated_at on public.events;
+create trigger events_set_updated_at
+before update on public.events
+for each row execute function public.set_updated_at();
+
+drop trigger if exists sales_set_updated_at on public.sales;
+create trigger sales_set_updated_at
+before update on public.sales
+for each row execute function public.set_updated_at();
+
+-- ===========================================================================
+-- RLS — políticas demo (abiertas, para desarrollo). Cerrar para producción.
+-- ===========================================================================
+alter table public.admin_users enable row level security;
+alter table public.hotels enable row level security;
+alter table public.recommendations enable row level security;
+alter table public.events enable row level security;
+alter table public.sales enable row level security;
+
+drop policy if exists "demo read admin_users" on public.admin_users;
+create policy "demo read admin_users" on public.admin_users for select using (true);
+drop policy if exists "demo write admin_users" on public.admin_users;
+create policy "demo write admin_users" on public.admin_users for all using (true) with check (true);
+
+drop policy if exists "demo read hotels" on public.hotels;
+create policy "demo read hotels" on public.hotels for select using (true);
+drop policy if exists "demo write hotels" on public.hotels;
+create policy "demo write hotels" on public.hotels for all using (true) with check (true);
+
+drop policy if exists "demo read recommendations" on public.recommendations;
+create policy "demo read recommendations" on public.recommendations for select using (true);
+drop policy if exists "demo write recommendations" on public.recommendations;
+create policy "demo write recommendations" on public.recommendations for all using (true) with check (true);
+
+drop policy if exists "demo read events" on public.events;
+create policy "demo read events" on public.events for select using (true);
+drop policy if exists "demo write events" on public.events;
+create policy "demo write events" on public.events for all using (true) with check (true);
+
+drop policy if exists "demo read sales" on public.sales;
+create policy "demo read sales" on public.sales for select using (true);
+drop policy if exists "demo write sales" on public.sales;
+create policy "demo write sales" on public.sales for all using (true) with check (true);
+
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on public.admin_users, public.hotels,
+  public.recommendations, public.events, public.sales to anon, authenticated;
+
+-- ===========================================================================
+-- DATOS INICIALES (bootstrap). Usan WHERE NOT EXISTS, así no dependen de
+-- constraints y no duplican si ya existen.
+-- ===========================================================================
+insert into public.hotels (name, slug, location, plan, status, admin_name, public_url, qr_scans, auto_charge)
+select
+  'Hotel Atlântico Albufeira',
+  'hotel-atlantico-albufeira',
+  'Albufeira, Algarve, Portugal',
+  'Premium',
+  'Activo',
+  'Recepción Atlântico',
+  '/h/hotel-atlantico-albufeira',
+  0,
+  false
+where not exists (select 1 from public.hotels where slug = 'hotel-atlantico-albufeira');
+
+insert into public.admin_users (name, email, password, role, hotel_id, status)
+select 'Admin General', 'admin@demo.com', '123456', 'super_admin', null, 'Activo'
+where not exists (select 1 from public.admin_users where email = 'admin@demo.com');
+
+insert into public.admin_users (name, email, password, role, hotel_id, status)
+select 'Recepcion Atlantico', 'hotel@demo.com', '123456', 'hotel_admin', hotels.id, 'Activo'
+from public.hotels
+where hotels.slug = 'hotel-atlantico-albufeira'
+  and not exists (select 1 from public.admin_users where email = 'hotel@demo.com');
+
+insert into public.events (hotel_id, title, date, category, status)
+select id, 'FIESA Sand City', 'Temporada verano', 'Cultura', 'Publicado'
+from public.hotels
+where slug = 'hotel-atlantico-albufeira'
+  and not exists (select 1 from public.events where title = 'FIESA Sand City');
+
+-- Solo ejemplos para verificar el flujo. Ejecutar despues de schema.sql.
+-- No cambia precios ni datos de servicios existentes con el mismo titulo/hotel.
+
+insert into public.recommendations (
+  hotel_id, title, subtitle, category, short_description, full_description,
+  image, duration, location, status, featured, bookable,
+  price, provider_cost, receptionist_commission, system_commission, commission,
+  provider, payment_url, map_url, tips
+)
+select h.id, demo.title, demo.subtitle, demo.category, demo.description, demo.description,
+  demo.image, demo.duration, 'Albufeira, Algarve, Portugal', 'Publicado', true, true,
+  demo.price, demo.provider_cost, demo.receptionist_commission, demo.system_commission,
+  demo.receptionist_commission + demo.system_commission, demo.provider, '',
+  'https://maps.google.com/?q=Albufeira',
+  array['Ejemplo de prueba. Disponibilidad sujeta a confirmacion de la empresa.']
+from public.hotels h
+cross join (values
+  ('Gruta de Benagil en barco (demo)', 'Excursion', 'excursion',
+   'Salida en barco por la costa. Elegi fecha y horario para solicitar disponibilidad.',
+   'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=1000&q=80',
+   '3 a 4 horas', 60::numeric, 40::numeric, 10::numeric, 10::numeric, 'Benagil Tours (demo)'),
+  ('Alquiler de auto por dia (demo)', 'Alquiler de autos', 'alquiler-auto',
+   'Auto de alquiler con entrega a coordinar. La empresa confirma unidad, seguro y deposito.',
+   'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=1000&q=80',
+   'Por dia', 60::numeric, 40::numeric, 10::numeric, 10::numeric, 'Algarve Rent a Car (demo)'),
+  ('Alquiler de scooter 125 cc (demo)', 'Alquiler de motos', 'alquiler-moto',
+   'Scooter de alquiler por dia. Documentacion, seguro y deposito sujetos al proveedor.',
+   'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=1000&q=80',
+   'Por dia', 40::numeric, 30::numeric, 5::numeric, 5::numeric, 'Algarve Mobility (demo)')
+) as demo(title, subtitle, category, description, image, duration, price, provider_cost,
+  receptionist_commission, system_commission, provider)
+where h.slug = 'hotel-atlantico-albufeira'
+  and not exists (
+    select 1 from public.recommendations r
+    where r.hotel_id = h.id and r.title = demo.title
+  );
+
+notify pgrst, 'reload schema';
+
+commit;
+

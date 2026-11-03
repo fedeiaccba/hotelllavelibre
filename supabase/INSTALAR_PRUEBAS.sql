@@ -15,6 +15,13 @@ begin;
 
 create extension if not exists "pgcrypto";
 
+-- Never reopen demo permissions after the Auth migration.
+do $$ begin
+  if to_regprocedure('app_private.is_super_admin()') is not null then
+    raise exception 'La seguridad Auth ya esta instalada. No ejecutar el instalador de pruebas sobre esta base.';
+  end if;
+end $$;
+
 -- ===========================================================================
 -- TABLAS (create if not exists) + asegurar columnas faltantes (add if not exists)
 -- Las columnas se agregan como nullable / con default para no romper si la tabla
@@ -397,4 +404,3 @@ where h.slug = 'hotel-atlantico-albufeira'
 notify pgrst, 'reload schema';
 
 commit;
-

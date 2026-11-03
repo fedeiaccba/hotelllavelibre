@@ -1,15 +1,17 @@
 import { useState } from 'react';
-import { setSessionUser } from '../../data/adminMock';
+import { saveDemoSession } from '../../services/authService';
 import { authenticateAdmin } from '../../services/adminDataService';
 import BrandMark from '../BrandMark';
 import Icon from '../Icon';
 
-export default function AdminLogin() {
+export default function AdminLogin({ initialError = '' }) {
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (saving) return;
     setError('');
 
     if (!form.email.trim() || !form.password.trim()) {
@@ -18,19 +20,22 @@ export default function AdminLogin() {
     }
 
     let user;
+    setSaving(true);
     try {
       user = await authenticateAdmin(form.email, form.password);
     } catch (currentError) {
       setError(currentError.message || 'No se pudo iniciar sesión.');
+      setSaving(false);
       return;
     }
 
     if (!user) {
       setError('Email o contraseña incorrectos.');
+      setSaving(false);
       return;
     }
 
-    setSessionUser(user);
+    saveDemoSession(user);
     window.location.href = '/admin';
   }
 
@@ -101,17 +106,18 @@ export default function AdminLogin() {
                   value={form.password}
                 />
 
-                {error && (
+                {(error || initialError) && (
                   <p className="rounded-[18px] border border-[#f0d0d2] bg-[#fff7f7] px-4 py-3 text-sm font-medium text-[#8b4a4c]">
-                    {error}
+                    {error || initialError}
                   </p>
                 )}
 
                 <button
                   className="inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-[#1a1210] px-6 text-sm font-semibold text-[#ecca80] shadow-[0_16px_34px_rgba(26,18,16,0.22)] transition hover:bg-[#241915] active:scale-[0.98]"
                   type="submit"
+                  disabled={saving}
                 >
-                  Ingresar
+                  {saving ? 'Verificando...' : 'Ingresar'}
                   <Icon name="arrowRight" size={16} />
                 </button>
               </form>
@@ -139,6 +145,7 @@ function Field({ icon, label, onChange, placeholder, type, value }) {
           className="h-14 w-full rounded-full border border-[#e6d7bf] bg-white px-12 text-[15px] font-medium text-[#2a1d18] shadow-sm outline-none transition placeholder:text-[#b6a594] focus:border-[#c49a3f] focus:ring-4 focus:ring-[#e7cf9b]/70"
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
+          autoComplete={type === 'password' ? 'current-password' : 'username'}
           type={type}
           value={value}
         />

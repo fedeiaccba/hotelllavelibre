@@ -1,6 +1,7 @@
 import { ADMIN_EVENTS, ADMIN_USERS, HOTELS, PLATFORM_SETTINGS, SALES } from '../data/adminMock';
 import { isSupabaseConfigured, supabase } from '../lib/supabaseClient';
 import { canCollectCash, quoteBooking, validateBooking } from '../lib/booking';
+import { getAuthenticatedAdmin, signOutAdmin } from './authService';
 
 // Comportamiento:
 // - Si Supabase está configurado (hay credenciales en .env.local), la base de datos
@@ -20,14 +21,11 @@ const BOOKING_FIELDS = {
   expiresAt: 'expires_at', paidAt: 'paid_at', collectedBy: 'collected_by',
 };
 
-function toAdminUserRow(user) {
+function adminArgs(user, id = null) {
   return {
-    name: user.name,
-    email: user.email,
-    password: user.password,
-    role: user.role,
-    hotel_id: user.role === 'hotel_admin' ? user.hotelId || null : null,
-    status: user.status || 'Activo',
+    p_id: id, p_name: user.name, p_email: user.email, p_role: user.role,
+    p_hotel_id: user.role === 'hotel_admin' ? user.hotelId || null : null,
+    p_status: user.status || 'Activo',
   };
 }
 
@@ -36,7 +34,6 @@ function fromAdminUserRow(row) {
     id: row.id,
     name: row.name,
     email: row.email,
-    password: row.password,
     role: row.role,
     hotelId: row.hotel_id,
     status: row.status || 'Activo',
@@ -188,31 +185,6 @@ function fromEventRow(row) {
   };
 }
 
-function toSaleRow(sale) {
-  const split = getSaleSplit(sale);
-
-  return {
-    ...Object.fromEntries(Object.entries(BOOKING_FIELDS)
-      .filter(([key]) => sale[key] !== undefined)
-      .map(([key, column]) => [column, sale[key] || null])),
-    hotel_id: sale.hotelId,
-    recommendation_id: sale.recommendationId || null,
-    recommendation_title: sale.recommendationTitle,
-    receptionist_id: sale.receptionistId || null,
-    receptionist_name: sale.receptionistName,
-    guest_name: sale.guestName || '',
-    guest_room: sale.guestRoom || '',
-    quantity: Number(sale.quantity) || 1,
-    amount: Number(sale.amount) || 0,
-    provider_amount: split.providerAmount,
-    receptionist_commission: split.receptionistCommission,
-    system_commission: split.systemCommission,
-    commission: split.commission,
-    status: sale.status || 'Cobrado',
-    note: sale.note || '',
-  };
-}
-
 function fromSaleRow(row) {
   const receptionistCommission = toMoney(row.receptionist_commission ?? row.commission);
   const systemCommission = toMoney(row.system_commission);
@@ -284,16 +256,10 @@ export async function authenticateAdmin(email, password) {
   const normalizedEmail = email.trim().toLowerCase();
 
   if (isSupabaseConfigured) {
-    const { data, error } = await supabase
-      .from('admin_users')
-      .select('*')
-      .eq('email', normalizedEmail)
-      .eq('password', password)
-      .eq('status', 'Activo')
-      .maybeSingle();
-
-    if (error) throw error;
-    return data ? fromAdminUserRow(data) : null;
+    const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+    if (error) throw new Error('No se pudo ingresar. Revisá el email y la contraseña.');
+    try { return await getAuthenticatedAdmin(); }
+    catch (accessError) { await signOutAdmin(); throw accessError; }
   }
 
   return findLocalAdmin(email, password);
@@ -315,11 +281,7 @@ export async function listAdminUsers() {
 
 export async function createAdminUser(payload) {
   if (isSupabaseConfigured) {
-    const { data, error } = await supabase
-      .from('admin_users')
-      .insert(toAdminUserRow(payload))
-      .select()
-      .single();
+    const { data, error } = await supabase.rpc('manage_admin_user', adminArgs(payload));
 
     if (error) throw error;
     return fromAdminUserRow(data);
@@ -338,12 +300,7 @@ export async function createAdminUser(payload) {
 
 export async function updateAdminUser(id, payload) {
   if (isSupabaseConfigured) {
-    const { data, error } = await supabase
-      .from('admin_users')
-      .update(toAdminUserRow(payload))
-      .eq('id', id)
-      .select()
-      .single();
+    const { data, error } = await supabase.rpc('manage_admin_user', adminArgs(payload, id));
 
     if (error) throw error;
     return fromAdminUserRow(data);
@@ -365,7 +322,7 @@ export async function updateAdminUser(id, payload) {
 
 export async function deleteAdminUser(id) {
   if (isSupabaseConfigured) {
-    const { error } = await supabase.from('admin_users').delete().eq('id', id);
+    const { error } = await supabase.rpc('delete_admin_access', { p_id: id });
     if (error) throw error;
     return;
   }
@@ -495,6 +452,19 @@ export async function listRecommendations() {
   }
 
   return readLocal(LOCAL_RECOMMENDATIONS_KEY, PLATFORM_SETTINGS.recommendations);
+}
+
+export async function listPublicCatalog(slug = null) {
+  if (isSupabaseConfigured) {
+    const { data, error } = await supabase.rpc('get_public_catalog', { p_slug: slug });
+    if (error) throw error;
+    return { hotels: data.hotel ? [fromHotelRow(data.hotel)] : [],
+      recommendations: (data.recommendations || []).map(fromRecommendationRow) };
+  }
+  const hotels = (await listHotels()).filter((hotel) => hotel.status === 'Activo');
+  const hotel = slug ? hotels.find((item) => item.slug === slug) : hotels[0];
+  return { hotels: hotel ? [hotel] : [], recommendations: hotel ? (await listRecommendations())
+    .filter((item) => String(item.hotelId) === String(hotel.id) && item.status === 'Publicado') : [] };
 }
 
 export async function createRecommendation(payload) {
@@ -643,14 +613,7 @@ export async function listSales() {
 
 export async function createSale(payload) {
   if (isSupabaseConfigured) {
-    const { data, error } = await supabase
-      .from('sales')
-      .insert({ ...toSaleRow(payload), ...(payload.id ? { id: payload.id } : {}) })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return fromSaleRow(data);
+    throw new Error('Registrá el cobro desde la bandeja de reservas.');
   }
 
   const sales = readLocal(LOCAL_SALES_KEY, SALES);
@@ -670,15 +633,7 @@ export async function createSale(payload) {
 
 export async function updateSale(id, payload) {
   if (isSupabaseConfigured) {
-    const { data, error } = await supabase
-      .from('sales')
-      .update(toSaleRow(payload))
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return fromSaleRow(data);
+    throw new Error('Los importes de una reserva registrada no se pueden editar.');
   }
 
   const sales = readLocal(LOCAL_SALES_KEY, SALES);
@@ -699,9 +654,7 @@ export async function updateSale(id, payload) {
 
 export async function deleteSale(id) {
   if (isSupabaseConfigured) {
-    const { error } = await supabase.from('sales').delete().eq('id', id);
-    if (error) throw error;
-    return;
+    throw new Error('Los cobros se conservan como historial.');
   }
 
   const sales = readLocal(LOCAL_SALES_KEY, SALES);
@@ -712,6 +665,18 @@ export async function deleteSale(id) {
 }
 
 export async function createGuestBooking(recommendationId, form, hotelId) {
+  if (isSupabaseConfigured) {
+    const { data, error } = await supabase.rpc('create_guest_booking', {
+      p_request_id: form.requestId, p_recommendation_id: recommendationId, p_hotel_id: hotelId,
+      p_guest_name: form.guestName.trim(), p_guest_room: form.guestRoom.trim(),
+      p_guest_contact: form.guestContact.trim(), p_quantity: Number(form.quantity),
+      p_service_date: form.serviceDate, p_service_time: form.serviceTime,
+      p_end_date: form.endDate || null, p_end_time: form.endTime || null,
+      p_pickup_location: form.pickupLocation.trim(),
+    });
+    if (error) throw error;
+    return fromSaleRow(data);
+  }
   const start = validateBooking(form);
   const recommendations = await listRecommendations();
   const item = recommendations.find((rec) => String(rec.id) === String(recommendationId));
@@ -730,25 +695,17 @@ export async function createGuestBooking(recommendationId, form, hotelId) {
     bookingStatus: 'Solicitada', paymentMethod: 'cash', status: 'Reservado', expiresAt,
     receptionistName: 'Reserva web', note: 'Disponibilidad pendiente de confirmación del proveedor.',
   };
-  if (isSupabaseConfigured) {
-    const { data, error } = await supabase.from('sales').select('*').eq('id', payload.id).maybeSingle();
-    if (error) throw error;
-    if (data) return fromSaleRow(data);
-  } else {
-    const existing = readLocal(LOCAL_SALES_KEY, SALES).find((sale) => sale.id === payload.id);
-    if (existing) return existing;
-  }
-  try { return await createSale(payload); }
-  catch (error) {
-    if (isSupabaseConfigured && error.code === '23505') {
-      const result = await supabase.from('sales').select('*').eq('id', payload.id).single();
-      if (!result.error) return fromSaleRow(result.data);
-    }
-    throw error;
-  }
+  const existing = readLocal(LOCAL_SALES_KEY, SALES).find((sale) => sale.id === payload.id);
+  if (existing) return existing;
+  return createSale(payload);
 }
 
 export async function processBooking(sale, action, user) {
+  if (isSupabaseConfigured) {
+    const { data, error } = await supabase.rpc('process_booking', { p_sale_id: sale.id, p_action: action });
+    if (error) throw error;
+    return fromSaleRow(data);
+  }
   if (user.role !== 'super_admin' && String(user.hotelId) !== String(sale.hotelId)) {
     throw new Error('Esta reserva pertenece a otro hotel.');
   }
@@ -763,16 +720,6 @@ export async function processBooking(sale, action, user) {
     patch = { bookingStatus: 'Cancelada', status: 'Anulado' };
   } else {
     throw new Error('El cupón venció o su estado ya cambió. Actualizá las reservas.');
-  }
-  if (isSupabaseConfigured) {
-    const changes = Object.fromEntries(Object.entries(patch).map(([key, value]) => [BOOKING_FIELDS[key] || key, value]));
-    let query = supabase.from('sales').update(changes).eq('id', sale.id)
-      .eq('hotel_id', sale.hotelId).eq('status', sale.status).eq('booking_status', sale.bookingStatus);
-    if (action !== 'cancel') query = query.gt('expires_at', now).eq('payment_method', 'cash');
-    const { data, error } = await query.select().maybeSingle();
-    if (error) throw error;
-    if (!data) throw new Error('La reserva cambió en otro dispositivo. Actualizá las reservas.');
-    return fromSaleRow(data);
   }
   const mutate = () => {
     const sales = readLocal(LOCAL_SALES_KEY, SALES);

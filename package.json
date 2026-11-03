@@ -7,8 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "test": "node --test tests/booking.test.js",
+    "test": "node --test tests/booking.test.js tests/security.test.js",
     "test:booking": "node tests/booking-flow.mjs",
+    "test:auth": "node tests/auth-flow.mjs",
     "supabase:prepare": "node scripts/prepare-supabase.mjs",
     "preview": "vite preview"
   },
@@ -20,6 +21,7 @@
     "tailwindcss": "^4.3.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.14",
     "@eslint/js": "^10.0.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { clearSessionUser, setSessionUser } from '../../data/adminMock';
+import { saveDemoSession, signOutAdmin } from '../../services/authService';
 import { CATEGORIES } from '../../data/recommendations';
 import { isSupabaseConfigured } from '../../lib/supabaseClient';
 import {
@@ -184,11 +184,11 @@ export default function AdminDashboard({ user }) {
     () => {
       if (isSuperAdmin) return hotels;
       const assignedHotels = hotels.filter((hotel) => String(hotel.id) === String(user.hotelId));
-      return assignedHotels.length > 0 ? assignedHotels : hotels.slice(0, 1);
+      return assignedHotels;
     },
     [hotels, isSuperAdmin, user.hotelId],
   );
-  const activeHotel = scopedHotels[0] || hotels[0];
+  const activeHotel = scopedHotels[0];
   const scopedRecommendations = useMemo(
     () =>
       isSuperAdmin
@@ -257,9 +257,9 @@ export default function AdminDashboard({ user }) {
     );
   }, [scopedSales]);
 
-  function handleLogout() {
-    clearSessionUser();
-    window.location.href = '/admin/login';
+  async function handleLogout() {
+    try { await signOutAdmin(); window.location.href = '/admin/login'; }
+    catch { setError('No se pudo cerrar la sesión. Volvé a intentarlo.'); }
   }
 
   async function saveHotel(payload) {
@@ -332,7 +332,7 @@ export default function AdminDashboard({ user }) {
       }
 
       if (String(savedUser?.id) === String(user.id)) {
-        setSessionUser(savedUser);
+        saveDemoSession(savedUser);
       }
 
       setModal(null);
@@ -497,6 +497,7 @@ export default function AdminDashboard({ user }) {
             <button
               className="inline-flex items-center gap-2 rounded-full border border-[#e6d7bf] bg-white/75 px-3 py-2 text-xs font-semibold text-[#6e1f2c] shadow-sm transition hover:border-[#cbb389]"
               onClick={handleLogout}
+              aria-label="Salir"
               type="button"
             >
               <Icon name="logOut" size={14} />
@@ -553,7 +554,7 @@ export default function AdminDashboard({ user }) {
           <div className="mt-6 grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
             <HotelProfileSection
               hotel={activeHotel}
-              onEdit={() => activeHotel && setModal({ mode: 'edit-hotel', item: activeHotel })}
+              onEdit={!isSupabaseConfigured ? () => activeHotel && setModal({ mode: 'edit-hotel', item: activeHotel }) : null}
             />
             <CategoriesSection onSchema={() => setModal({ mode: 'schema' })} />
           </div>
@@ -704,7 +705,7 @@ function HeroPanel({ isSuperAdmin, onNewHotel, onNewRecommendation, onNewSale, o
         </div>
         <div className="flex flex-wrap gap-2">
           {isSuperAdmin && <ActionButton icon="plus" label="Nuevo hotel" onClick={onNewHotel} />}
-          <ActionButton icon="coins" label="Cobro manual" onClick={onNewSale} />
+          {!isSupabaseConfigured && <ActionButton icon="coins" label="Cobro manual" onClick={onNewSale} />}
           <ActionButton icon="list" label="Nuevo servicio" onClick={onNewRecommendation} variant="soft" />
           <ActionButton icon="eye" label="Ver web pública" onClick={onViewPublic} variant="soft" />
         </div>
@@ -845,7 +846,7 @@ function AdminUsersSection({ currentUserId, hotels, loading, onDelete, onEdit, o
 function HotelProfileSection({ hotel, onEdit }) {
   return (
     <Panel
-      action={<ActionButton icon="edit" label="Editar datos" onClick={onEdit} size="sm" />}
+      action={onEdit && <ActionButton icon="edit" label="Editar datos" onClick={onEdit} size="sm" />}
       eyebrow="Hotel"
       icon="hotel"
       title={hotel?.name || 'Hotel'}
@@ -882,7 +883,7 @@ function HotelProfileSection({ hotel, onEdit }) {
 function SalesSection({ hotels, isSuperAdmin, loading, onDelete, onEdit, onNew, sales, totals }) {
   return (
     <Panel
-      action={<ActionButton icon="coins" label="Registrar cobro" onClick={onNew} size="sm" />}
+      action={!isSupabaseConfigured && <ActionButton icon="coins" label="Registrar cobro" onClick={onNew} size="sm" />}
       eyebrow="Comisiones del conserje"
       icon="ticket"
       title="Resumen y cobros manuales"
@@ -951,10 +952,10 @@ function SalesSection({ hotels, isSuperAdmin, loading, onDelete, onEdit, onNew, 
                         </p>
                       )}
                     </div>
-                    <div className="flex flex-col gap-2">
+                    {!isSupabaseConfigured && <div className="flex flex-col gap-2">
                       <IconButton icon="edit" label="Editar" onClick={() => onEdit(sale)} />
                       <IconButton icon="x" label="Eliminar" onClick={() => onDelete(sale)} />
-                    </div>
+                    </div>}
                   </div>
                 </div>
                 {sale.note && (
@@ -1486,7 +1487,7 @@ function AdminUserForm({ hotels, initialValue, onCancel, onSubmit }) {
         <FormField label="Email" onChange={(value) => update('email', value)} required type="email" value={form.email} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="ContraseÃ±a" onChange={(value) => update('password', value)} required value={form.password} />
+        {!isSupabaseConfigured && <FormField label="Contraseña" onChange={(value) => update('password', value)} required value={form.password} />}
         <SelectField
           label="Rol"
           onChange={(value) => update('role', value)}

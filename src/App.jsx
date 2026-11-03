@@ -10,30 +10,48 @@ import RecommendationCard from './components/RecommendationCard';
 import SearchBar from './components/SearchBar';
 import AdminDashboard from './components/admin/AdminDashboard';
 import AdminLogin from './components/admin/AdminLogin';
-import { getSessionUser } from './data/adminMock';
-import { createGuestBooking, listHotels, listRecommendations } from './services/adminDataService';
-import { isSupabaseConfigured } from './lib/supabaseClient';
+import { createGuestBooking, listPublicCatalog } from './services/adminDataService';
+import { getAuthenticatedAdmin } from './services/authService';
+import { isSupabaseConfigured, supabase } from './lib/supabaseClient';
 import './index.css';
 
 export default function App() {
   const path = window.location.pathname;
 
-  if (path.startsWith('/admin/login')) {
-    return <AdminLogin />;
-  }
-
-  if (path.startsWith('/admin')) {
-    const sessionUser = getSessionUser();
-
-    if (!sessionUser) {
-      window.history.replaceState(null, '', '/admin/login');
-      return <AdminLogin />;
-    }
-
-    return <AdminDashboard user={sessionUser} />;
-  }
+  if (path.startsWith('/admin')) return <AdminGate />;
 
   return <PublicGuide />;
+}
+
+function AdminGate() {
+  const [state, setState] = useState({ loading: true, user: null, error: '' });
+  useEffect(() => {
+    let alive = true;
+    let revision = 0;
+    async function refresh() {
+      const current = ++revision;
+      try {
+        const user = await getAuthenticatedAdmin();
+        if (alive && current === revision) setState({ loading: false, user, error: '' });
+      } catch (error) {
+        if (alive && current === revision) setState({ loading: false, user: null, error: error.message });
+      }
+    }
+    void refresh();
+    // Run Supabase queries outside its auth callback lock.
+    const listener = isSupabaseConfigured ? supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        revision += 1;
+        if (alive) setState({ loading: false, user: null, error: '' });
+      } else if (event !== 'INITIAL_SESSION') setTimeout(() => { if (alive) void refresh(); }, 0);
+    }) : null;
+    const visible = () => { if (document.visibilityState === 'visible') void refresh(); };
+    document.addEventListener('visibilitychange', visible);
+    return () => { alive = false; listener?.data.subscription.unsubscribe(); document.removeEventListener('visibilitychange', visible); };
+  }, []);
+  if (state.loading) return <main className="p-8" role="status">Verificando acceso...</main>;
+  if (state.user && !window.location.pathname.startsWith('/admin/login')) return <AdminDashboard key={`${state.user.authUserId || state.user.id}:${state.user.role}:${state.user.hotelId}`} user={state.user} />;
+  return <AdminLogin initialError={state.error} />;
 }
 
 function PublicGuide() {
@@ -50,10 +68,8 @@ function PublicGuide() {
   useEffect(() => {
     async function loadPublicData() {
       try {
-        const [hotelData, recommendationData] = await Promise.all([
-          listHotels(),
-          listRecommendations(),
-        ]);
+        const slug = path.startsWith('/h/') ? decodeURIComponent(path.split('/h/')[1]?.split('/')[0] || '') : null;
+        const { hotels: hotelData, recommendations: recommendationData } = await listPublicCatalog(slug);
         const publishedRecommendations = recommendationData.filter(
           (item) => !item.status || item.status === 'Publicado',
         );
@@ -65,7 +81,7 @@ function PublicGuide() {
     }
 
     loadPublicData();
-  }, []);
+  }, [path]);
 
   const activeHotel = useMemo(() => {
     const slug = path.startsWith('/h/') ? decodeURIComponent(path.split('/h/')[1]?.split('/')[0] || '') : '';
@@ -91,14 +107,10 @@ function PublicGuide() {
 
         return matchesHotel && isPublished && matchesCategory && matchesSearch;
       })
-      // Priorizamos los servicios que más comisión dejan (orden interno, el huésped no ve el monto).
       .sort(
         (a, b) =>
           Number(Boolean(b.featured)) - Number(Boolean(a.featured)) ||
-          ((Number(b.receptionistCommission ?? b.commission) || 0) +
-            (Number(b.systemCommission) || 0)) -
-            ((Number(a.receptionistCommission ?? a.commission) || 0) +
-              (Number(a.systemCommission) || 0)),
+          a.title.localeCompare(b.title),
       );
   }, [activeCategory, activeHotelId, recommendations, search]);
 

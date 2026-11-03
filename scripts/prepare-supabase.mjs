@@ -8,6 +8,6 @@ writeFileSync(output, [
   '-- SOLO PRUEBAS. Incluye usuarios demo y permisos publicos abiertos.',
   '-- Ejecutar completo en SQL Editor. No borra tablas ni reservas.',
   'begin;', schema.trim(), seed.trim(),
-  "notify pgrst, 'reload schema';", 'commit;', '',
-].join('\n\n'));
+  "notify pgrst, 'reload schema';", 'commit;',
+].join('\n\n') + '\n');
 console.log('Preparado: supabase/INSTALAR_PRUEBAS.sql');

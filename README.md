@@ -1,5 +1,16 @@
 # React + Vite
 
+## Usuarios y permisos
+
+El backend conectado ahora usa Supabase Auth y RLS por hotel. Para activar esta
+version sobre una base de pruebas existente, seguir
+[supabase/SEGURIDAD_AUTH.md](./supabase/SEGURIDAD_AUTH.md). Incluye las cuentas
+previas y la migracion SQL; no publicarla sin coordinar ese cambio de base.
+Las contrasenas demo solo funcionan en modo local.
+
+Pruebas de permisos con PostgreSQL embebido: `npm test`.
+Pruebas del login con respuestas Auth simuladas: `npm run test:auth` (localhost:5176).
+
 ## Reservas y cupones
 
 El catalogo permite solicitar excursiones y alquileres y descargar un cupon
@@ -13,8 +24,8 @@ La demo usa localStorage y no comparte reservas entre dispositivos.
 Para la base existente, aplicar
 `supabase/migrations/20261031_booking_workflow.sql` en el SQL Editor.
 No usar reset.sql. Esta migracion fue preparada, no aplicada por el agente.
-El login y RLS existentes son de demostracion; no habilitar cobros reales sin
-autorizacion y validacion de las operaciones en servidor.
+El instalador inicial crea permisos de demostracion; aplicar despues la
+migracion Auth indicada arriba para que las operaciones queden protegidas.
 
 Verificacion: `npm test`, `npm run lint`, `npm run build`.
 Con la demo corriendo en localhost:5175: `npm run test:booking`.

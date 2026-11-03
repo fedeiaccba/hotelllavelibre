@@ -20,7 +20,9 @@ const supabaseKey = (
 export const isSupabaseConfigured = env.VITE_DEMO_MODE !== 'true' && Boolean(supabaseUrl && supabaseKey);
 
 export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } })
+  ? createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+    })
   : null;
 
 if (typeof window !== 'undefined') {

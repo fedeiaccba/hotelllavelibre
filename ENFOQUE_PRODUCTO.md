@@ -6,6 +6,13 @@ Este documento define el enfoque propuesto; no describe funciones ya terminadas.
 
 ## Primera implementacion local
 
+La siguiente iteracion implementa login con Supabase Auth, permisos por hotel,
+catalogo publico sin comisiones, reservas con tarifas calculadas en servidor y
+cobros atomicos auditados. Su activacion remota requiere crear las cuentas Auth
+y ejecutar `supabase/migrations/20261031_auth_and_permissions.sql`; ver
+`supabase/SEGURIDAD_AUTH.md`. No se ejecuto esta migracion automaticamente.
+Las referencias a login/RLS demo mas abajo describen la instalacion inicial.
+
 Ya se implemento el recorrido de solicitud en efectivo: fechas, horario,
 contacto, recogida y cupon descargable con codigo. En autos/motos se solicita
 entrega/devolucion y se calcula por periodos iniciados de 24 horas.

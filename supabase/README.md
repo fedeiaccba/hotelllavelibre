@@ -1,5 +1,9 @@
 # Armar Supabase para LlaveLibre
 
+Para activar el login Auth y los permisos del codigo actual, seguir
+[SEGURIDAD_AUTH.md](./SEGURIDAD_AUTH.md) despues de la instalacion inicial.
+La instalacion de pruebas por si sola ya no habilita el login de la version nueva.
+
 Esta guia conecta la version actual para pruebas de catalogo, reservas y cobros
 de ejemplo. El SQL incluye usuarios demo y acceso publico a las tablas para
 mantener compatibilidad con el login actual. No usar datos personales reales

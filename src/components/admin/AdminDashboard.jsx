@@ -27,6 +27,7 @@ import {
 import BrandMark from '../BrandMark';
 import Icon from '../Icon';
 import BookingInbox from './BookingInbox';
+import ReceptionDashboard from './ReceptionDashboard';
 
 const EMPTY_HOTEL = {
   name: '',
@@ -143,6 +144,10 @@ create table public.sales (...); -- cobros, proveedor y comisiones
 El archivo completo esta en supabase/schema.sql.`;
 
 export default function AdminDashboard({ user }) {
+  return user.role === 'super_admin' ? <GeneralAdminDashboard user={user} /> : <ReceptionDashboard user={user} />;
+}
+
+function GeneralAdminDashboard({ user }) {
   const isSuperAdmin = user.role === 'super_admin';
   const [adminUsers, setAdminUsers] = useState([]);
   const [events, setEvents] = useState([]);

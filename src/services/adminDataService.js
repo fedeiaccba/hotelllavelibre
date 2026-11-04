@@ -66,6 +66,7 @@ function fromHotelRow(row) {
     publicUrl: row.public_url,
     qrScans: row.qr_scans || 0,
     autoCharge: Boolean(row.auto_charge),
+    timeZone: row.time_zone || 'Europe/Lisbon',
     recommendations: row.recommendations || 0,
     lastUpdate: formatDate(row.updated_at),
   };

@@ -13,6 +13,14 @@ Pruebas del login con respuestas Auth simuladas: `npm run test:auth` (localhost:
 
 ## Reservas y cupones
 
+El panel del hotel tiene tres vistas: Reservas, Cobrar y Caja y comisiones.
+Permite buscar por huesped/habitacion/cupon, confirmar disponibilidad, cancelar,
+registrar efectivo con confirmacion y consultar/exportar cobros por fechas.
+La caja resume importes registrados y su reparto; no registra transferencias ni
+liquidaciones a empresas. La administracion general conserva el catalogo y los accesos.
+Prueba de este recorrido, errores y pantallas moviles: `npm run test:reception`
+(demo local en localhost:5175).
+
 El catalogo permite solicitar excursiones y alquileres y descargar un cupon
 para pagar en efectivo. La bandeja `/admin` permite confirmar disponibilidad
 con la empresa y registrar el efectivo recibido. Online sigue deshabilitado.

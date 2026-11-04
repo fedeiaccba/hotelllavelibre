@@ -1,0 +1,110 @@
+.reception-dashboard { min-height: 100dvh; background: #fbf5ea; color: #2a1d18; }
+.reception-width { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
+.reception-topbar { background: #fffdfa; border-bottom: 1px solid #e6d7bf; }
+.reception-identity { display: flex; justify-content: space-between; align-items: center; gap: 20px; min-height: 90px; padding-block: 16px; }
+.reception-brand, .reception-top-actions { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.reception-brand h1 { font-size: 18px; line-height: 1.4; font-weight: 600; overflow-wrap: anywhere; }
+.reception-brand p { margin-top: 2px; font-size: 13px; color: #7c6a5e; }
+.reception-button, .reception-icon { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border-radius: 6px; font-size: 14px; font-weight: 600; line-height: 1.4; text-decoration: none; cursor: pointer; }
+.reception-button { padding: 11px 16px; border: 1px solid transparent; }
+.reception-primary { background: #6e1f2c; border-color: #6e1f2c; color: white; }
+.reception-primary:hover { background: #561420; }
+.reception-soft { background: #fffdfa; border-color: #d8c5aa; color: #6e1f2c; }
+.reception-soft:hover { background: #f5ecdf; }
+.reception-icon { flex-shrink: 0; width: 44px; border: 1px solid #e6d7bf; background: #fffdfa; color: #6e1f2c; }
+.reception-button svg, .reception-tabs svg { flex-shrink: 0; }
+.reception-dashboard button:disabled { cursor: wait; opacity: .55; }
+.reception-dashboard :is(button,a,input,select,summary):focus-visible, .reception-dialog button:focus-visible { outline: 3px solid #c49a3f; outline-offset: 3px; }
+.reception-tabs { display: flex; border-bottom: 1px solid #d8c5aa; gap: 22px; margin: 12px 0 28px; }
+.reception-tabs > button { position: relative; display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 64px; padding: 14px 5px; border-bottom: 3px solid transparent; font-size: 15px; font-weight: 500; color: #7c6a5e; }
+.reception-tabs > button[aria-selected="true"] { border-bottom-color: #6e1f2c; color: #6e1f2c; font-weight: 600; }
+.reception-count { display: inline-flex; min-width: 24px; height: 24px; padding-inline: 6px; align-items: center; justify-content: center; background: #f0e5d6; color: #6e1f2c; font-size: 12px; border-radius: 50%; }
+.reception-panel { background: #fffdfa; min-height: 360px; margin-bottom: 32px; border-block: 1px solid #e6d7bf; }
+.reception-heading { display: flex; justify-content: space-between; align-items: start; padding: 24px; gap: 20px; }
+.reception-heading h2 { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 30px; line-height: 1.2; font-weight: 600; }
+.reception-heading p { margin-top: 6px; color: #7c6a5e; font-size: 13px; line-height: 1.6; }
+.reception-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) 260px; align-items: end; gap: 16px; padding: 0 24px 24px; }
+.reception-toolbar.reception-search { grid-template-columns: minmax(0, 1fr); max-width: 720px; }
+.reception-field { min-width: 0; display: grid; gap: 7px; font-size: 13px; font-weight: 500; }
+.reception-field :is(input,select) { width: 100%; min-width: 0; height: 46px; padding: 0 12px; border: 1px solid #d8c5aa; border-radius: 6px; background: white; color: #2a1d18; font-size: 14px; }
+.reception-empty { padding: 36px 24px; font-size: 14px; line-height: 1.8; color: #7c6a5e; }
+.reception-reservation { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 20px; padding: 24px; border-top: 1px solid #e6d7bf; }
+.reception-reservation p, .reception-payment p { font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
+.reception-row-title { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 4px; }
+.reception-row-title h3 { font-size: 17px; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; }
+.reception-state { display: inline-flex; border-radius: 4px; padding: 3px 8px; background: #f6ecd3; color: #795e1b; font-size: 12px; line-height: 1.6; font-weight: 500; }
+.reception-state.is-ready, .reception-state.is-paid { color: #356b48; background: #e6f1e9; }
+.reception-state.is-cancelled, .reception-state.is-expired { background: #f3e7e4; color: #8b4a4c; }
+.reception-room { font-weight: 500; margin-bottom: 8px; }
+.reception-muted, .reception-coupon { color: #7c6a5e; font-size: 13px !important; }
+.reception-coupon { overflow-wrap: anywhere; margin-top: 4px; }
+.reception-row-action { display: grid; justify-items: end; gap: 16px; }
+.reception-row-action > strong { font-size: 21px; white-space: nowrap; }
+.reception-details { margin-top: 12px; font-size: 13px; }
+.reception-details summary { cursor: pointer; color: #6e1f2c; width: fit-content; padding-block: 4px; }
+.reception-details dl, .reception-confirm-details { display: grid; gap: 10px; margin-top: 12px; }
+.reception-details dl > div, .reception-confirm-details > div { display: grid; grid-template-columns: 160px minmax(0,1fr); gap: 12px; }
+.reception-details dt, .reception-confirm-details dt { color: #7c6a5e; }
+.reception-details dd, .reception-confirm-details dd { margin: 0; overflow-wrap: anywhere; }
+.reception-cancel { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin-top: 12px; color: #8b4a4c; }
+.reception-payment { padding: 24px; border-top: 1px solid #e6d7bf; }
+.reception-pay-total { margin: 20px 0 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 20px; justify-content: space-between; padding-top: 16px; border-top: 1px dashed #d8c5aa; }
+.reception-pay-total span { color: #7c6a5e; font-size: 14px; }
+.reception-pay-total strong { font-size: 28px; font-weight: 600; }
+.reception-payment-state p { margin-bottom: 12px; }
+.reception-totals { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); padding: 24px; gap: 24px; background: #f5eee3; border-block: 1px solid #e6d7bf; }
+.reception-totals dt { color: #7c6a5e; font-size: 13px; line-height: 1.6; }
+.reception-totals dd { margin-top: 8px; font-size: 24px; line-height: 1.4; font-weight: 600; overflow-wrap: anywhere; }
+.reception-totals > div:first-child dd { color: #6e1f2c; }
+.reception-ledger-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 24px; border-bottom: 1px solid #e6d7bf; }
+.reception-ledger-heading h3 { font-size: 16px; font-weight: 600; }
+.reception-ledger-heading span { color: #7c6a5e; font-size: 13px; }
+.reception-ledger-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 16px; padding: 20px 24px; border-bottom: 1px solid #eee2d0; font-size: 14px; line-height: 1.8; }
+.reception-ledger-row > div:last-child { text-align: right; }
+.reception-ledger-row p { color: #7c6a5e; font-size: 13px; overflow-wrap: anywhere; }
+.reception-ledger-row strong { font-weight: 600; }
+.reception-alert, .reception-success { display: flex; align-items: center; gap: 12px; justify-content: space-between; padding: 14px 18px; margin-bottom: 20px; border-radius: 6px; font-size: 14px; line-height: 1.6; }
+.reception-alert { background: #fff0ef; color: #873c48; border: 1px solid #efd1d4; }
+.reception-alert button { text-decoration: underline; }
+.reception-success { background: #eaf3ec; color: #356b48; border: 1px solid #cadfce; }
+.reception-success > svg { flex-shrink: 0; }
+.reception-success > span { flex: 1; overflow-wrap: anywhere; }
+.reception-backdrop { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; padding: 20px; background: #1a12108c; }
+.reception-dialog { width: 100%; max-width: 510px; max-height: 92dvh; overflow-y: auto; padding: 28px; border-radius: 8px; background: #fffdfa; color: #2a1d18; box-shadow: 0 20px 60px #1a121033; }
+.reception-dialog h2 { font-size: 23px; font-weight: 600; line-height: 1.4; margin-bottom: 12px; }
+.reception-dialog > p { font-size: 14px; line-height: 1.7; color: #7c6a5e; }
+.reception-dialog .reception-confirm-amount { font-size: 34px; color: #6e1f2c; font-weight: 600; padding-block: 16px; }
+.reception-confirm-details { font-size: 13px; line-height: 1.7; margin-block: 20px; }
+.reception-dialog-actions { display: flex; justify-content: end; gap: 12px; margin-top: 24px; }
+@media (max-width: 700px) {
+  .reception-width { padding-inline: 16px; }
+  .reception-identity { min-height: 80px; gap: 12px; }
+  .reception-brand { gap: 10px; }
+  .reception-brand h1 { font-size: 15px; }
+  .reception-brand p { font-size: 12px; }
+  .reception-top-actions { gap: 8px; }
+  .reception-top-actions a { width: 44px; padding: 0; }
+  .reception-top-actions a span { display: none; }
+  .reception-tabs { gap: 0; margin-bottom: 18px; }
+  .reception-tabs > button { flex: 1; min-width: 0; flex-wrap: wrap; gap: 5px; font-size: 13px; padding: 12px 4px; }
+  .reception-tabs > button:last-child > span { max-width: 90px; }
+  .reception-tabs > button > svg { width: 16px; height: 16px; }
+  .reception-count { width: 20px; min-width: 20px; height: 20px; font-size: 11px; }
+  .reception-heading { padding: 20px 16px; }
+  .reception-heading h2 { font-size: 27px; }
+  .reception-toolbar { padding: 0 16px 20px; grid-template-columns: minmax(0,1fr); }
+  .reception-reservation { padding: 20px 16px; grid-template-columns: minmax(0,1fr); gap: 16px; }
+  .reception-row-action { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; }
+  .reception-row-action .reception-button { flex: 1; }
+  .reception-payment { padding: 20px 16px; }
+  .reception-payment > .reception-button { width: 100%; }
+  .reception-details dl > div, .reception-confirm-details > div { grid-template-columns: 100px minmax(0,1fr); }
+  .reception-totals { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px 12px; padding: 20px 16px; }
+  .reception-totals dd { font-size: 21px; }
+  .reception-ledger-heading, .reception-ledger-row { padding: 20px 16px; }
+  .reception-ledger-row { grid-template-columns: minmax(0,1fr); gap: 8px; }
+  .reception-ledger-row > div:last-child { text-align: left; }
+  .reception-backdrop { padding: 12px; }
+  .reception-dialog { padding: 20px; }
+  .reception-dialog-actions { flex-direction: column-reverse; }
+}

@@ -37,17 +37,19 @@ try {
     localStorage.setItem('gringacho_recommendations', JSON.stringify(recs));
   });
   await page.goto(`${base}/admin`);
-  const inbox = page.locator('.booking-inbox');
+  const inbox = page.locator('.reception-panel');
   await page.getByLabel('Buscar reserva', { exact: true }).fill(sale.bookingCode);
   await inbox.getByRole('button', { name: 'Confirmar disponibilidad' }).click();
-  await inbox.getByRole('button', { name: /Recibir/ }).waitFor();
-  await inbox.getByRole('button', { name: /Recibir/ }).click();
-  await page.getByLabel('Mostrar', { exact: true }).selectOption('paid');
-  await inbox.getByText('Efectivo recibido', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Sí, la empresa confirmó', exact: true }).click();
+  await page.getByLabel('Estado', { exact: true }).selectOption('ready');
+  await inbox.getByRole('button', { name: 'Cobrar', exact: true }).click();
+  await inbox.getByRole('button', { name: 'Registrar efectivo recibido', exact: true }).click();
+  await page.getByRole('button', { name: 'Sí, recibí el efectivo', exact: true }).click();
+  await page.getByText('Este cupón ya está cobrado.', { exact: true }).waitFor();
   sale = await page.evaluate(() => JSON.parse(localStorage.getItem('gringacho_sales')).find((s) => s.guestName === 'Ana Prueba'));
   assert.equal(sale.status, 'Cobrado'); assert.equal(sale.amount, 120);
   assert.equal(sale.providerAmount, 80); assert.equal(sale.collectedBy, 'Recepción Demo');
-  assert.equal(await inbox.getByRole('button', { name: /Recibir/ }).count(), 0);
+  assert.equal(await inbox.getByRole('button', { name: 'Registrar efectivo recibido', exact: true }).count(), 0);
   const concurrency = await page.evaluate(async () => {
     const { processBooking } = await import('/src/services/adminDataService.js');
     const sales = JSON.parse(localStorage.getItem('gringacho_sales'));
